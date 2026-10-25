@@ -42,6 +42,10 @@ pnpm dist        # → release/Arborist-0.1.0-arm64.dmg
 
 实现了 [`/api/arbor/status`](docs/arbor-status.md) 的成员 app 状态灯显示"自报健康 + 一行状态"，否则降级为端口探测（实现约 30 分钟）。
 
+## 门户
+
+同一份状态、浏览器里看：**http://127.0.0.1:8790/**（Arborist 自己托管，仅本机）。app 卡片 + 健康灯 + 深链，背景随一天时间变化，断连时优雅降级。托盘右键 → 打开门户。不起 Electron 预览：`pnpm preview:portal`。
+
 ## 许可
 
 MIT

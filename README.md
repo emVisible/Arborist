@@ -42,6 +42,10 @@ Or run from source: `pnpm dev`. Tweak the dropdown UI in a plain browser without
 
 Member apps that implement [`/api/arbor/status`](docs/arbor-status.md) get self-reported health and a status line instead of a plain port probe (~30 min to implement).
 
+## Portal
+
+The same state, in your browser: **http://127.0.0.1:8790/** (served by Arborist itself, local-only). App cards with health dots, deep links, a background that follows the time of day, and graceful degradation when the connection drops. Tray right-click → 打开门户. Preview it without Electron: `pnpm preview:portal`.
+
 ## License
 
 MIT
