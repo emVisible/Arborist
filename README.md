@@ -6,11 +6,12 @@ A resident macOS menu-bar control center for my personal apps: one manifest per 
 
 I build a lot of small tools. Each one grew its own ad-hoc entry point — `dev.sh`, `start.sh`, `webui.sh`, a Makefile, or plain muscle memory in a shell history. Arborist replaces all of that with one convention: every repo that wants to be managed drops an `app.toml` at its root, and Arborist takes it from there.
 
-Status: **spec phase** — the contracts are the first deliverable, so member apps (Ametrine, Axiforge, …) can implement them while the UI is being built.
+Status: **planned** — stack decided (Electron), implementation roadmap in [PLAN.md](PLAN.md); member apps can implement the status contract in parallel.
 
 ## Documents
 
 - [PROJECT.md](PROJECT.md) — design decisions, scope, and the decision log
+- [PLAN.md](PLAN.md) — the v1 implementation plan: architecture, milestones, acceptance criteria
 - [docs/app-toml.md](docs/app-toml.md) — the `app.toml` manifest spec
 - [docs/arbor-status.md](docs/arbor-status.md) — the optional `/api/arbor/status` contract for member apps
 

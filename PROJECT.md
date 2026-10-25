@@ -50,12 +50,13 @@ Arborist 自己也注册进自己（`type = "menubar"`）——这是 manifest �
 ## 决策记录
 
 1. **产品模式，不是开发模式。** 打开中控台的心理动词是"用"，不是"继续开发"。因此不管环境构建、依赖重建、数据库迁移；Hertz 这类重项目的迁移在它自己的启动脚本里解决。
-2. **manifest 约定，不是自动扫描。** 扫描判定信号弱（有 package.json 算可启动吗？）、学习仓库全是噪音、每种技术栈一套推断规则维护成本高。manifest 注册一次 30 秒，零误判。
+2. **manifest 约定，不是自动扫描。** 扫描判定信号弱（有 package.json 算可启动吗？）、学习仓库全是噪音、每种技术栈一套推断规则维护成本高。manifest 注册一次 30 秒，零误判。发现机制是确定性的：只在配置的 roots 目录第一层子目录里寻找 `app.toml` 文件本身，不做任何推断。
 3. **menu bar 常驻，不是 web 门户。** 门户有鸡生蛋问题（还得先启动门户），且依赖生态存活率。门户降级为 v2，消费同一契约。
 4. **main 分支纪律。** web 类 app 从源码启动，"用成品"的前提是 checkout 稳定：manifest 声明 `branch = "main"`，不在 main 就黄灯拒启。开发在分支上做，合并即发布。
 5. **状态 = 健康检查轮询。** 由此状态认领免费（见组成部分 4）。
 6. **CLI 类 app 不进 v1。** 跑完就退的工具，"启动"这个词不成立；有真实需求再议。
 7. **成员一律平级。** Hertz 等只是注册表里的一行，中控台不为核心成员做特殊逻辑。
+8. **技术栈 Electron。** 复用 ministat 的 electron-vite + TypeScript + electron-builder 套路，Tray / BrowserWindow / child_process 全是最老牌稳定的 API，零 native 模块、运行时依赖仅一个 toml 解析库。代价是 ~200MB 常驻内存，决策时已接受。实现路线见 [PLAN.md](PLAN.md)。
 
 ## 明确不做（v1）
 
@@ -67,7 +68,7 @@ Arborist 自己也注册进自己（`type = "menubar"`）——这是 manifest �
 
 ## 开放决定
 
-- **技术栈**：Electron（复用 ministat 套路，出活最快，代价是最重的 menu bar 常驻）vs Swift/SwiftUI（MacBin 底子，单二进制几十 MB 内存，最像基础设施该有的样子，迭代慢一截）。
+（无——技术栈已定为 Electron，见决策记录 8；实现路线见 [PLAN.md](PLAN.md)。）
 
 ## v2 预览（现在只留接口，不做实现）
 
