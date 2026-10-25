@@ -210,7 +210,22 @@ body {
 .foot {
   display: flex;
   justify-content: flex-end;
+  align-items: center;
   gap: 6px;
+}
+
+.toggle {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-right: auto;
+  font-size: 11px;
+  color: #9aa0ab;
+  cursor: pointer;
+}
+
+.toggle input {
+  accent-color: #3fb950;
 }
 
 .ghost {

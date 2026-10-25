@@ -13,6 +13,15 @@ import {
   stopWeb,
   tailFile
 } from './supervisor'
+import { openApp } from './openers'
+import {
+  addLoginItem,
+  appPathOf,
+  AutomationError,
+  listLoginItems,
+  normalizeItemName,
+  removeLoginItem
+} from './loginitems'
 import type { AppView, LightState, ListResult } from '../../shared/types'
 
 export interface ManagerOptions {
@@ -114,7 +123,10 @@ export class AppManager extends EventEmitter {
     if (!entry) return
     const m = entry.m
 
-    if (m.type !== 'web') return // app / menubar：M4
+    if (m.type !== 'web') {
+      this.open(name)
+      return
+    }
 
     if (entry.state === 'running' || entry.state === 'degraded') {
       this.open(name)
@@ -191,8 +203,44 @@ export class AppManager extends EventEmitter {
   open(name: string): void {
     const entry = this.entries.get(name)
     if (!entry) return
-    if (entry.m.type === 'web' && entry.m.url) this.opts.openExternal?.(entry.m.url)
-    // app / menubar：M4
+    if (entry.m.type === 'web' && entry.m.url) {
+      this.opts.openExternal?.(entry.m.url)
+      return
+    }
+    if (entry.m.open) openApp(entry.m.open)
+  }
+
+  async loginGet(name: string): Promise<boolean | null> {
+    const m = this.get(name)
+    if (!m || m.type !== 'menubar' || !m.login || !m.open) return null
+    try {
+      const items = await listLoginItems()
+      const target = normalizeItemName(m.open)
+      return items.some((item) => normalizeItemName(item) === target)
+    } catch {
+      return null
+    }
+  }
+
+  async loginSet(name: string, on: boolean): Promise<{ ok: boolean; reason?: string }> {
+    const m = this.get(name)
+    if (!m || m.type !== 'menubar' || !m.open) {
+      return { ok: false, reason: '仅 menubar 类且声明 open 的 app 支持登录项管理' }
+    }
+    try {
+      if (on) {
+        const path = await appPathOf(m.open)
+        await addLoginItem(path)
+      } else {
+        const items = await listLoginItems()
+        const match = items.find((item) => normalizeItemName(item) === normalizeItemName(m.open!))
+        if (match) await removeLoginItem(match)
+      }
+      return { ok: true }
+    } catch (e) {
+      const reason = e instanceof AutomationError ? e.message : `操作失败：${(e as Error).message}`
+      return { ok: false, reason }
+    }
   }
 
   tail(name: string, lines: number): string {

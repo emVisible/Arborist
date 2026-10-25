@@ -1,4 +1,4 @@
-import { BrowserWindow, Menu, ipcMain, shell } from 'electron'
+import { app, BrowserWindow, Menu, ipcMain, shell } from 'electron'
 import { join } from 'node:path'
 import type { AppManager } from './core/manager'
 import type { UpdateEvent } from '../shared/types'
@@ -37,12 +37,25 @@ export function registerIpc(manager: AppManager): void {
     manager.tail(name, lines)
   )
   ipcMain.handle('arbor:logs:open', (_e, name: string) => openLog(name))
+  ipcMain.handle('arbor:login:get', (_e, name: string) => manager.loginGet(name))
+  ipcMain.handle('arbor:login:set', (_e, name: string, on: boolean) =>
+    manager.loginSet(name, on)
+  )
+  ipcMain.handle('arbor:self-login:get', () => app.getLoginItemSettings().openAtLogin)
+  ipcMain.handle('arbor:self-login:set', (_e, on: boolean) => {
+    app.setLoginItemSettings({ openAtLogin: on })
+  })
+  ipcMain.handle('arbor:login:settings', () => {
+    void shell.openExternal(
+      'x-apple.systempreferences:com.apple.LoginItems-Settings.extension'
+    )
+  })
 
   ipcMain.on('arbor:panel:hide', (event) => {
     BrowserWindow.fromWebContents(event.sender)?.hide()
   })
 
-  ipcMain.on('arbor:contextmenu', (event, name: string) => {
+  ipcMain.on('arbor:contextmenu', (event, name: string, extras?: { loginChecked?: boolean }) => {
     const m = manager.get(name)
     if (!m) return
     const state = manager.list().apps.find((a) => a.name === name)?.state ?? 'stopped'
@@ -70,6 +83,19 @@ export function registerIpc(manager: AppManager): void {
         click: () => shell.showItemInFolder(join(m.repoDir, 'app.toml'))
       }
     ]
+    if (m.type === 'menubar' && m.login) {
+      template.push(
+        { type: 'separator' },
+        {
+          label: '开机自启',
+          type: 'checkbox',
+          checked: extras?.loginChecked ?? false,
+          click: (item) => {
+            void manager.loginSet(name, item.checked)
+          }
+        }
+      )
+    }
     Menu.buildFromTemplate(template).popup({
       window: BrowserWindow.fromWebContents(event.sender) ?? undefined
     })

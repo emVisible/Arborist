@@ -27,6 +27,11 @@ export default function App() {
 
 function Panel() {
   const [data, setData] = useState<ListResult>({ apps: [], errors: [] })
+  const [selfLogin, setSelfLogin] = useState(false)
+
+  useEffect(() => {
+    void window.arbor.selfLoginGet().then(setSelfLogin)
+  }, [])
 
   const refresh = useCallback(() => {
     void window.arbor.list().then(setData)
@@ -86,6 +91,17 @@ function Panel() {
       </main>
 
       <footer className="foot">
+        <label className="toggle" title="Arborist 随系统启动">
+          <input
+            type="checkbox"
+            checked={selfLogin}
+            onChange={(e) => {
+              setSelfLogin(e.target.checked)
+              void window.arbor.selfLoginSet(e.target.checked)
+            }}
+          />
+          自启
+        </label>
         <button className="ghost" onClick={() => window.arbor.openConfig()}>
           配置
         </button>
@@ -107,7 +123,13 @@ function Row({ app }: { app: AppView }) {
   }
   const onContextMenu = (e: React.MouseEvent): void => {
     e.preventDefault()
-    window.arbor.contextMenu(app.name)
+    if (app.type === 'menubar') {
+      void window.arbor.loginGet(app.name).then((checked) => {
+        window.arbor.contextMenu(app.name, { loginChecked: checked ?? false })
+      })
+    } else {
+      window.arbor.contextMenu(app.name)
+    }
   }
   return (
     <div className="row" title={app.line ?? app.name} onClick={onClick} onContextMenu={onContextMenu}>
