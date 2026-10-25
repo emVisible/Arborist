@@ -1,6 +1,7 @@
 import { app } from 'electron'
 import { TrayController } from './tray'
 import { registerIpc } from './ipc'
+import { AppManager } from './core/manager'
 
 if (!app.requestSingleInstanceLock()) {
   app.quit()
@@ -8,9 +9,12 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     if (process.platform === 'darwin') app.dock?.hide()
 
-    registerIpc()
-    const tray = new TrayController()
-    tray.start()
+    const manager = new AppManager()
+    void manager.init().then(() => {
+      registerIpc(manager)
+      const tray = new TrayController(manager)
+      tray.start()
+    })
   })
 
   // resident menu-bar app: windows closing never quits

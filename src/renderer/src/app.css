@@ -52,6 +52,39 @@ body {
   color: #9aa0ab;
 }
 
+.banner {
+  padding: 6px 10px;
+  border-radius: 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  max-height: 72px;
+  overflow: hidden;
+}
+
+.banner.error {
+  background: rgba(248, 81, 73, 0.14);
+  color: #ff9b94;
+}
+
+.banner.warn {
+  background: rgba(210, 153, 34, 0.14);
+  color: #e3b341;
+}
+
+.banner-item {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.list {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow-y: auto;
+}
+
 .empty {
   flex: 1;
   display: flex;
@@ -69,4 +102,129 @@ body {
 .hint {
   font-size: 11px;
   color: #7a7f8a;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 7px 8px;
+  border-radius: 9px;
+}
+
+.row:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.icon {
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  flex: none;
+  object-fit: contain;
+}
+
+.icon.letter {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 600;
+  color: #cbd2dc;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.meta {
+  flex: 1;
+  min-width: 0;
+}
+
+.name {
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sub {
+  font-size: 11px;
+  color: #8b919c;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.tag {
+  flex: none;
+  font-size: 10px;
+  padding: 1px 6px;
+  border-radius: 5px;
+  color: #9aa0ab;
+  background: rgba(255, 255, 255, 0.07);
+}
+
+.dot {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+}
+
+.dot.stopped {
+  background: #62676f;
+}
+
+.dot.starting {
+  background: #e6b450;
+  animation: pulse 1.1s ease-in-out infinite;
+}
+
+.dot.stopping {
+  background: #e6b450;
+  animation: pulse 1.1s ease-in-out infinite;
+}
+
+.dot.running {
+  background: #3fb950;
+  box-shadow: 0 0 5px rgba(63, 185, 80, 0.5);
+}
+
+.dot.degraded {
+  background: #d29922;
+}
+
+.dot.error {
+  background: #f85149;
+}
+
+.dot.blocked {
+  background: #db6d28;
+}
+
+@keyframes pulse {
+  50% {
+    opacity: 0.35;
+  }
+}
+
+.foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+}
+
+.ghost {
+  appearance: none;
+  border: none;
+  border-radius: 7px;
+  padding: 4px 10px;
+  font-size: 11px;
+  color: #9aa0ab;
+  background: rgba(255, 255, 255, 0.06);
+  cursor: pointer;
+}
+
+.ghost:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: #e8eaee;
 }

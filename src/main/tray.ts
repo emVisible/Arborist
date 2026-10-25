@@ -1,10 +1,13 @@
 import { BrowserWindow, Menu, Tray, screen } from 'electron'
 import { join } from 'node:path'
 import { createPanelWindow } from './window'
+import type { AppManager } from './core/manager'
 
 export class TrayController {
   private tray: Tray | null = null
   private panel: BrowserWindow | null = null
+
+  constructor(private manager: AppManager) {}
 
   start(): void {
     this.tray = new Tray(join(__dirname, '../../resources/tray/iconTemplate.png'))
@@ -14,7 +17,11 @@ export class TrayController {
     this.tray.on('click', () => this.togglePanel())
     this.tray.on('right-click', () => {
       this.tray?.popUpContextMenu(
-        Menu.buildFromTemplate([{ label: '退出 Arborist', role: 'quit' }])
+        Menu.buildFromTemplate([
+          { label: '重扫注册表', click: () => void this.manager.rescan() },
+          { type: 'separator' },
+          { label: '退出 Arborist', role: 'quit' }
+        ])
       )
     })
   }
