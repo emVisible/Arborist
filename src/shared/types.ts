@@ -16,6 +16,7 @@ export interface AppView {
   state: LightState
   line?: string
   icon?: string
+  url?: string
 }
 
 export interface ManifestError {

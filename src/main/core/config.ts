@@ -6,6 +6,7 @@ import { parse } from 'smol-toml'
 export interface ArborConfig {
   roots: string[]
   pollIntervalMs: number
+  port: number
 }
 
 export const ARBOR_DIR = join(homedir(), '.arborist')
@@ -18,8 +19,10 @@ export class ConfigError extends Error {}
 const TEMPLATE = `# Arborist 配置
 # roots: 在这些目录的第一层子目录里寻找 app.toml
 # poll_interval_ms: web 类 app 的状态轮询间隔
+# port: 本地 API 与门户端口（仅 127.0.0.1）
 roots = ["~/Code"]
 poll_interval_ms = 10000
+port = 8790
 `
 
 export function expandTilde(p: string): string {
@@ -32,7 +35,7 @@ export function loadConfig(configPath = CONFIG_PATH): ArborConfig {
   if (!existsSync(configPath)) {
     mkdirSync(dirname(configPath), { recursive: true })
     writeFileSync(configPath, TEMPLATE)
-    return { roots: [expandTilde('~/Code')], pollIntervalMs: 10000 }
+    return { roots: [expandTilde('~/Code')], pollIntervalMs: 10000, port: 8790 }
   }
 
   let raw: unknown
@@ -60,5 +63,10 @@ export function loadConfig(configPath = CONFIG_PATH): ArborConfig {
     throw new ConfigError('poll_interval_ms 必须是不小于 500 的数字')
   }
 
-  return { roots: roots.map(expandTilde), pollIntervalMs: poll }
+  const port = typeof t.port === 'number' ? t.port : 8790
+  if (!Number.isInteger(port) || port < 1024 || port > 65535) {
+    throw new ConfigError('port 必须是 1024–65535 的整数')
+  }
+
+  return { roots: roots.map(expandTilde), pollIntervalMs: poll, port }
 }

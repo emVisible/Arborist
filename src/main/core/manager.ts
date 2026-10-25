@@ -47,7 +47,7 @@ export interface AppEntry {
 }
 
 export class AppManager extends EventEmitter {
-  private config: ArborConfig = { roots: [], pollIntervalMs: 10000 }
+  private config: ArborConfig = { roots: [], pollIntervalMs: 10000, port: 8790 }
   private entries = new Map<string, AppEntry>()
   private errors: { repoDir: string; message: string }[] = []
   private configError: string | undefined
@@ -116,6 +116,10 @@ export class AppManager extends EventEmitter {
 
   get(name: string): Manifest | undefined {
     return this.entries.get(name)?.m
+  }
+
+  get apiPort(): number {
+    return this.config.port
   }
 
   async start(name: string): Promise<void> {
@@ -343,7 +347,8 @@ export class AppManager extends EventEmitter {
       type: e.m.type,
       state: e.state,
       line: e.line,
-      icon: this.iconOf(e.m)
+      icon: this.iconOf(e.m),
+      url: e.m.type === 'web' ? e.m.url : undefined
     }
   }
 
