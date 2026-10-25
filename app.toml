@@ -1,0 +1,6 @@
+name  = "arborist"
+title = "Arborist"
+type  = "menubar"
+open  = "Arborist"
+login = true
+notes = "自己管自己"

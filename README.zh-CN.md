@@ -25,6 +25,23 @@
 
 v1 明确不做：目录扫描自动发现、环境构建 / 依赖管理 / 数据库迁移、远程主机、web 仪表盘——v2 门户会消费同一套契约，现在做的任何东西都不会被扔掉。
 
+## 安装
+
+```sh
+pnpm install
+pnpm dist        # → release/Arborist-0.1.0-arm64.dmg
+```
+
+源码运行：`pnpm dev`。不启动 Electron、在浏览器里直接调 dropdown UI：`pnpm preview:ui`。
+
+## 快速上手
+
+1. 首次启动会生成 `~/.arborist/config.toml`——把 `roots` 配成你的 repo 所在目录（默认 `["~/Code"]`）。
+2. 在这些目录下的任意 repo 根目录放一个 `app.toml`（[规范](docs/app-toml.md)）。
+3. 点击托盘图标：左键一行启动/打开；右键有停止、日志、Finder、登录项。
+
+实现了 [`/api/arbor/status`](docs/arbor-status.md) 的成员 app 状态灯显示"自报健康 + 一行状态"，否则降级为端口探测（实现约 30 分钟）。
+
 ## 许可
 
 MIT

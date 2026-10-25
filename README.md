@@ -25,6 +25,23 @@ Status: **planned** — stack decided (Electron), implementation roadmap in [PLA
 
 Explicitly not in v1: auto-discovery by scanning directories, environment building / dependency management / migrations, remote hosts, and a web dashboard — the v2 portal will consume the exact same contracts, so nothing built now gets thrown away.
 
+## Install
+
+```sh
+pnpm install
+pnpm dist        # → release/Arborist-0.1.0-arm64.dmg
+```
+
+Or run from source: `pnpm dev`. Tweak the dropdown UI in a plain browser without Electron: `pnpm preview:ui`.
+
+## Quick start
+
+1. First launch creates `~/.arborist/config.toml` — set `roots` to where your repos live (default `["~/Code"]`).
+2. Drop an `app.toml` in any repo root under those roots ([spec](docs/app-toml.md)).
+3. Click the tray icon. Left-click a row to start/open; right-click for stop, logs, Finder, login items.
+
+Member apps that implement [`/api/arbor/status`](docs/arbor-status.md) get self-reported health and a status line instead of a plain port probe (~30 min to implement).
+
 ## License
 
 MIT
