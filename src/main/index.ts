@@ -1,4 +1,4 @@
-import { app } from 'electron'
+import { app, shell } from 'electron'
 import { TrayController } from './tray'
 import { registerIpc } from './ipc'
 import { AppManager } from './core/manager'
@@ -9,7 +9,7 @@ if (!app.requestSingleInstanceLock()) {
   app.whenReady().then(() => {
     if (process.platform === 'darwin') app.dock?.hide()
 
-    const manager = new AppManager()
+    const manager = new AppManager({ openExternal: (url) => void shell.openExternal(url) })
     void manager.init().then(() => {
       registerIpc(manager)
       const tray = new TrayController(manager)

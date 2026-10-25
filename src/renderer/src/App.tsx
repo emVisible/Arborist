@@ -21,12 +21,21 @@ export default function App() {
   useEffect(() => {
     refresh()
     const off = window.arbor.onRefresh(refresh)
+    const offEvent = window.arbor.onEvent((e) => {
+      setData((d) => ({
+        ...d,
+        apps: d.apps.map((a) =>
+          a.name === e.name ? { ...a, state: e.state, line: e.line } : a
+        )
+      }))
+    })
     const onKey = (e: KeyboardEvent): void => {
       if (e.key === 'Escape') window.arbor.hidePanel()
     }
     window.addEventListener('keydown', onKey)
     return () => {
       off()
+      offEvent()
       window.removeEventListener('keydown', onKey)
     }
   }, [refresh])
@@ -75,8 +84,19 @@ export default function App() {
 }
 
 function Row({ app }: { app: AppView }) {
+  const onClick = (): void => {
+    if (app.type === 'web' && ['stopped', 'error', 'blocked'].includes(app.state)) {
+      void window.arbor.start(app.name)
+    } else {
+      void window.arbor.open(app.name)
+    }
+  }
+  const onContextMenu = (e: React.MouseEvent): void => {
+    e.preventDefault()
+    window.arbor.contextMenu(app.name)
+  }
   return (
-    <div className="row" title={app.line ?? app.name}>
+    <div className="row" title={app.line ?? app.name} onClick={onClick} onContextMenu={onContextMenu}>
       {app.icon ? (
         <img className="icon" src={app.icon} alt="" />
       ) : (
