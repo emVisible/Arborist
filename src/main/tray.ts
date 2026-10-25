@@ -1,12 +1,28 @@
-import { BrowserWindow, Menu, Tray, screen, shell } from 'electron'
+import { BrowserWindow, Menu, Tray, nativeImage, screen, shell } from 'electron'
+import type { NativeImage } from 'electron'
 import { join } from 'node:path'
 import { createPanelWindow } from './window'
 import type { AppManager } from './core/manager'
+
+function loadTrayImage(base: string, template: boolean): NativeImage {
+  const dir = join(__dirname, '../../resources/tray')
+  const img = nativeImage.createFromPath(join(dir, `${base}.png`))
+  const img2 = nativeImage.createFromPath(join(dir, `${base}@2x.png`))
+  if (!img2.isEmpty()) {
+    const size = img2.getSize()
+    img.addRepresentation({ scaleFactor: 2, buffer: img2.toPNG(), width: size.width, height: size.height })
+  }
+  img.setTemplateImage(template)
+  return img
+}
 
 export class TrayController {
   private tray: Tray | null = null
   private panel: BrowserWindow | null = null
   private portalUrl: string | null = null
+  private normalIcon: NativeImage | null = null
+  private alertIcon: NativeImage | null = null
+  private alertShown = false
 
   constructor(private manager: AppManager) {}
 
@@ -15,9 +31,15 @@ export class TrayController {
   }
 
   start(): void {
-    this.tray = new Tray(join(__dirname, '../../resources/tray/iconTemplate.png'))
+    this.normalIcon = loadTrayImage('iconTemplate', true)
+    this.alertIcon = loadTrayImage('iconAlert', false)
+    this.tray = new Tray(this.normalIcon)
     this.tray.setToolTip('Arborist')
     this.panel = createPanelWindow()
+
+    this.manager.on('update', () => this.refreshAlert())
+    this.manager.on('refresh', () => this.refreshAlert())
+    this.refreshAlert()
 
     this.tray.on('click', () => this.togglePanel())
     this.tray.on('right-click', () => {
@@ -33,6 +55,15 @@ export class TrayController {
       template.push({ type: 'separator' }, { label: '退出 Arborist', role: 'quit' })
       this.tray?.popUpContextMenu(Menu.buildFromTemplate(template))
     })
+  }
+
+  // 任一 app 进入 error 时托盘切红点告警，恢复后切回
+  private refreshAlert(): void {
+    if (!this.tray) return
+    const hasError = this.manager.list().apps.some((a) => a.state === 'error')
+    if (hasError === this.alertShown) return
+    this.alertShown = hasError
+    this.tray.setImage(hasError ? this.alertIcon! : this.normalIcon!)
   }
 
   private togglePanel(): void {

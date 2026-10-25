@@ -91,6 +91,11 @@ function Panel() {
       </main>
 
       <footer className="foot">
+        {data.unregisteredCount ? (
+          <span className="foot-hint" title="roots 下未放 app.toml 的 repo 数">
+            {data.unregisteredCount} 未注册
+          </span>
+        ) : null}
         <label className="toggle" title="Arborist 随系统启动">
           <input
             type="checkbox"

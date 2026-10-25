@@ -128,8 +128,45 @@ function appIcon(size) {
   return png(size, px)
 }
 
+// 告警托盘图标：黑树 + 右上红点（非 template，macOS 不再单色渲染）
+function alertGlyph(size) {
+  const px = new Uint8Array(size * size * 4)
+  const s = size / 16
+  const canopy = { cx: 7.2 * s, cy: 6.6 * s, r: 4.4 * s }
+  const trunk = { x0: 6.3 * s, x1: 8.1 * s, y0: 10 * s, y1: 15 * s }
+  const dot = { cx: 13.2 * s, cy: 3.6 * s, r: 2.5 * s }
+  for (let y = 0; y < size; y++) {
+    for (let x = 0; x < size; x++) {
+      const dCanopy = canopy.r - Math.hypot(x + 0.5 - canopy.cx, y + 0.5 - canopy.cy)
+      const dTrunk = Math.min(
+        x + 0.5 - trunk.x0,
+        trunk.x1 - x - 0.5,
+        y + 0.5 - trunk.y0,
+        trunk.y1 - y - 0.5
+      )
+      const treeA = cover(Math.max(dCanopy, dTrunk))
+      const dotA = cover(dot.r - Math.hypot(x + 0.5 - dot.cx, y + 0.5 - dot.cy))
+      const i = (y * size + x) * 4
+      if (dotA > 0) {
+        px[i] = 248
+        px[i + 1] = 81
+        px[i + 2] = 73
+        px[i + 3] = Math.round(dotA * 255)
+      } else {
+        px[i] = 0
+        px[i + 1] = 0
+        px[i + 2] = 0
+        px[i + 3] = Math.round(treeA * 255)
+      }
+    }
+  }
+  return png(size, px)
+}
+
 mkdirSync(join(root, 'resources/tray'), { recursive: true })
 writeFileSync(join(root, 'resources/tray/iconTemplate.png'), trayGlyph(16))
 writeFileSync(join(root, 'resources/tray/iconTemplate@2x.png'), trayGlyph(32))
+writeFileSync(join(root, 'resources/tray/iconAlert.png'), alertGlyph(16))
+writeFileSync(join(root, 'resources/tray/iconAlert@2x.png'), alertGlyph(32))
 writeFileSync(join(root, 'resources/icon.png'), appIcon(1024))
 console.log('icons written to resources/')

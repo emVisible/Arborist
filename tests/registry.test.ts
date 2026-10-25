@@ -39,17 +39,19 @@ open = "Hertz"
 `
 
 describe('discoverApps', () => {
-  it('发现合法 app，跳过无 manifest 和隐藏目录', () => {
+  it('发现合法 app，跳过无 manifest 和隐藏目录，统计未注册', () => {
     const root = tmpRoot()
     repo(root, 'good-web', WEB)
     repo(root, 'good-app', APP)
     repo(root, 'no-manifest')
+    repo(root, 'no-manifest-either')
     repo(root, '.hidden', WEB)
     repo(root, 'node_modules', WEB)
 
-    const { apps, errors } = discoverApps([root])
+    const { apps, errors, unregistered } = discoverApps([root])
     expect(errors).toEqual([])
     expect(apps.map((a) => a.name)).toEqual(['good-app', 'good-web'])
+    expect(unregistered).toBe(2)
   })
 
   it('坏 manifest 进 errors 且带 repo 路径', () => {

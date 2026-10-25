@@ -71,6 +71,13 @@ export function registerIpc(manager: AppManager): void {
         enabled: m.type === 'web' && ['running', 'degraded', 'error', 'starting'].includes(state),
         click: () => void manager.stop(name)
       },
+      {
+        label: '重启',
+        enabled: m.type === 'web' && ['running', 'degraded', 'error'].includes(state),
+        click: () => {
+          void manager.stop(name).then(() => manager.start(name))
+        }
+      },
       { label: '打开', click: () => manager.open(name) },
       {
         label: '日志',

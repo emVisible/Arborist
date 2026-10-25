@@ -28,6 +28,7 @@ export interface ListResult {
   apps: AppView[]
   errors: ManifestError[]
   configError?: string
+  unregisteredCount?: number
 }
 
 export interface UpdateEvent {

@@ -22,6 +22,7 @@ export interface Manifest {
 export interface DiscoveryResult {
   apps: Manifest[]
   errors: ManifestError[]
+  unregistered: number
 }
 
 const TYPES: AppType[] = ['web', 'app', 'menubar']
@@ -31,6 +32,7 @@ export function discoverApps(roots: string[]): DiscoveryResult {
   const apps: Manifest[] = []
   const errors: ManifestError[] = []
   const seen = new Set<string>()
+  let unregistered = 0
 
   for (const root of roots.map(expandTilde)) {
     let entries
@@ -47,7 +49,10 @@ export function discoverApps(roots: string[]): DiscoveryResult {
       }
       const repoDir = join(root, entry.name)
       const file = join(repoDir, 'app.toml')
-      if (!existsSync(file)) continue
+      if (!existsSync(file)) {
+        unregistered++
+        continue
+      }
 
       const result = parseManifest(file, repoDir)
       if ('error' in result) {
@@ -64,7 +69,7 @@ export function discoverApps(roots: string[]): DiscoveryResult {
   }
 
   apps.sort((a, b) => a.name.localeCompare(b.name))
-  return { apps, errors }
+  return { apps, errors, unregistered }
 }
 
 export function parseManifest(

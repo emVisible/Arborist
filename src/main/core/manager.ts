@@ -13,7 +13,7 @@ import {
   stopWeb,
   tailFile
 } from './supervisor'
-import { openApp } from './openers'
+import { openApp, appRunning } from './openers'
 import {
   addLoginItem,
   appPathOf,
@@ -51,6 +51,7 @@ export class AppManager extends EventEmitter {
   private entries = new Map<string, AppEntry>()
   private errors: { repoDir: string; message: string }[] = []
   private configError: string | undefined
+  private unregisteredCount = 0
   private iconCache = new Map<string, string>()
 
   constructor(readonly opts: ManagerOptions = {}) {
@@ -73,7 +74,7 @@ export class AppManager extends EventEmitter {
       }
     }
 
-    const { apps, errors } = discoverApps(this.config.roots)
+    const { apps, errors, unregistered } = discoverApps(this.config.roots)
     const next = new Map<string, AppEntry>()
     for (const m of apps) {
       const prev = this.entries.get(m.name)
@@ -95,10 +96,14 @@ export class AppManager extends EventEmitter {
     }
     this.entries = next
     this.errors = errors
+    this.unregisteredCount = unregistered
 
     for (const entry of this.entries.values()) {
-      if (entry.m.type === 'web' && entry.state !== 'stopping') {
+      if (entry.state === 'stopping') continue
+      if (entry.m.type === 'web') {
         this.schedulePoll(entry, entry.timer ? this.intervalMs() : 300)
+      } else if (entry.m.open && !entry.timer) {
+        this.schedulePoll(entry, this.appPollMs())
       }
     }
 
@@ -110,7 +115,8 @@ export class AppManager extends EventEmitter {
     return {
       apps: [...this.entries.values()].map((e) => this.viewOf(e)),
       errors: this.errors,
-      configError: this.configError
+      configError: this.configError,
+      unregisteredCount: this.unregisteredCount
     }
   }
 
@@ -281,6 +287,19 @@ export class AppManager extends EventEmitter {
   }
 
   private async poll(entry: AppEntry): Promise<void> {
+    if (entry.m.type !== 'web') {
+      if (entry.m.open) {
+        const running = await appRunning(entry.m.open)
+        const next: LightState = running ? 'running' : 'stopped'
+        if (entry.state !== next) {
+          entry.state = next
+          this.emitChange(entry)
+        }
+      }
+      if (entry.state !== 'stopping') this.schedulePoll(entry, this.appPollMs())
+      return
+    }
+
     try {
       const probe = await probeApp(entry.m, this.opts.probeTimeoutMs ?? 1500)
       this.applyProbe(entry, probe)
@@ -289,6 +308,10 @@ export class AppManager extends EventEmitter {
     }
     if (entry.state === 'starting') this.schedulePoll(entry, 1000)
     else if (entry.state !== 'stopping') this.schedulePoll(entry, this.intervalMs())
+  }
+
+  private appPollMs(): number {
+    return Math.max(this.intervalMs() * 2, 15_000)
   }
 
   private applyProbe(entry: AppEntry, p: Probe): void {

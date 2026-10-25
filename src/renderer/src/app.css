@@ -209,16 +209,26 @@ body {
 
 .foot {
   display: flex;
-  justify-content: flex-end;
+  justify-content: flex-start;
   align-items: center;
   gap: 6px;
+}
+
+.foot .ghost:last-of-type {
+  margin-left: auto;
+}
+
+.foot-hint {
+  margin-right: auto;
+  font-size: 10px;
+  color: #565b64;
+  padding: 4px 2px;
 }
 
 .toggle {
   display: flex;
   align-items: center;
   gap: 4px;
-  margin-right: auto;
   font-size: 11px;
   color: #9aa0ab;
   cursor: pointer;
