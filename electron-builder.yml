@@ -1,0 +1,17 @@
+appId: com.emvisible.arborist
+productName: Arborist
+directories:
+  output: release
+files:
+  - out/**
+  - resources/**
+mac:
+  category: public.app-category.developer-tools
+  icon: resources/icon.png
+  identity: "-"
+  target:
+    - target: dmg
+      arch:
+        - arm64
+dmg:
+  artifactName: Arborist-${version}-arm64.dmg

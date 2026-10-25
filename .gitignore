@@ -3,5 +3,7 @@ node_modules/
 __pycache__/
 dist/
 build/
+out/
+release/
 .env
 *.log
