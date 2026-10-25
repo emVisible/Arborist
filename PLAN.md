@@ -139,9 +139,54 @@ Arborist 自己的 app.toml（`type = "menubar"`，自注册）；Ametrine 实�
 ## 9. Backlog（编号防漂移，v1 一律不做）
 
 1. 端口冲突仲裁与分配
-2. `app` / `menubar` 运行态检测（osascript）
+2. ~~`app` / `menubar` 运行态检测（osascript）~~ → v0.2.0 M8 交付（pgrep 方案，无需权限）
 3. 自动更新
-4. v2 门户（消费 status 契约的浏览器首页）
+4. ~~v2 门户（消费 status 契约的浏览器首页）~~ → v0.2.0 M6/M7 交付
 5. `/api/arbor/search`、`/api/arbor/actions`
-6. roots 下"疑似可注册 repo"的提示（只提示，不推断启动方式）
+6. ~~roots 下"疑似可注册 repo"的提示~~ → v0.2.0 M8 交付（未注册计数）
 7. Playwright E2E
+
+---
+
+# v0.2.0 · Portal 与感知（M6–M9）
+
+主题：把 Arborist 从"单人操作台"升级为"生态面板"——v1 的状态只在 menu bar 里，v0.2 把同一份状态通过本地 API 送出去，让蓝图里 Grove 门户的第一版落地；同时让面板对 app/menubar 类诚实（灯不再永远是灰的），托盘图标能报警。
+
+原则不变：壳核分离（API/门户挂了不影响托盘面板）、优雅降级、零新增运行时依赖（HTTP 用 node:http，门户是单文件静态页，无构建管线）。
+
+## M6 · 本地 HTTP API（0.5d）
+
+`node:http` 服务，只绑 127.0.0.1，默认端口 8790（config.toml `port` 可改）：
+
+| 路由 | 方法 | 说明 |
+|---|---|---|
+| `/` | GET | 门户页面（M7） |
+| `/api/apps` | GET | `ListResult` JSON |
+| `/api/apps/:name/start`、`/stop`、`/open` | POST | 触发动作，202 |
+
+安全：所有 `/api/*` 要求自定义头 `X-Arbor: 1`——跨源页面带自定义头必须过 CORS 预检，而本服务永不批准预检，CSRF 因此被挡死；门户与 API 同源，不受影响。端口被占 → API/门户禁用并告警，托盘面板照常（降级）。
+
+验收：无头 403、带头 200；POST 触发 manager 动作；`/` 返回 HTML；close 后连接拒绝——全部进单测。
+
+## M7 · 门户页面（1d）
+
+`resources/portal/index.html` 单文件（无构建、无外部资源）：卡片网格（图标/标题/状态灯/line/类型）、5s 轮询刷新、web 卡点击 `window.open(url)`、app/menubar 卡点击 POST open、错误与空态优雅展示、按一天时间变化的背景氛围（晨/昼/暮/夜四档，对蓝图"有情绪的数字空间"的最小致敬）。
+
+`AppView` 增加 `url` 字段（web 类，供门户开页）。托盘右键菜单加"打开门户"。
+
+验收：浏览器打开 `http://127.0.0.1:8790/` 见到与面板一致的状态；杀掉一个服务 5s 内卡片变灰；API 禁用时门户不可达但托盘面板一切正常。
+
+## M8 · 感知升级（1d）
+
+- **app/menubar 运行态检测**：`pgrep -x <open>`（进程名即应用名，无权限要求；bundle id 走 `lsappinfo`），慢轮询（约 15s），灯在灰/绿间诚实切换。
+- **托盘告警**：任一 app `error` 时托盘图标切换为告警样式（红色圆点变体，非 template 着色），恢复后切回。图标由 gen-icons 生成。
+- **右键"重启"**：web 类 running/error 下 stop→start。
+- **未注册提示**：面板底部显示 roots 下未放 app.toml 的 repo 计数。
+
+验收：检测有单测（拷贝 sleep 为唯一进程名做探测夹具）；托盘切换与菜单项人工验收；面板计数真实。
+
+## M9 · 收尾（0.5d）
+
+版本 0.2.0、CHANGELOG、README/PROJECT/PLAN 对齐、dmg、打包后端到端冒烟（启动 → curl `/api/apps` 带 X-Arbor 头 → 门户 HTML → 杀进程）。
+
+**v0.2.0 完成定义**：M6–M9 全过 + 冒烟通过 + 门户在日常浏览器里挂一周不掉线。
