@@ -13,7 +13,8 @@ export function openApp(target: string): void {
   child.unref()
 }
 
-// 运行态检测：进程名 pgrep（无权限要求）；bundle id 走 lsappinfo
+// 运行态检测：进程名 pgrep（无权限要求）；bundle id 走 lsappinfo。
+// 已被杀但未清理干净的进程 pgrep 仍可能匹配——极端环境产物，按运行中计，可接受。
 export function appRunning(target: string): Promise<boolean> {
   if (isOpenBundleId(target)) {
     return new Promise((resolve) => {
