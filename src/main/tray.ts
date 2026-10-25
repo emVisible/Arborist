@@ -1,4 +1,4 @@
-import { BrowserWindow, Menu, Tray, screen } from 'electron'
+import { BrowserWindow, Menu, Tray, screen, shell } from 'electron'
 import { join } from 'node:path'
 import { createPanelWindow } from './window'
 import type { AppManager } from './core/manager'
@@ -6,8 +6,13 @@ import type { AppManager } from './core/manager'
 export class TrayController {
   private tray: Tray | null = null
   private panel: BrowserWindow | null = null
+  private portalUrl: string | null = null
 
   constructor(private manager: AppManager) {}
+
+  setPortalUrl(url: string | null): void {
+    this.portalUrl = url
+  }
 
   start(): void {
     this.tray = new Tray(join(__dirname, '../../resources/tray/iconTemplate.png'))
@@ -16,13 +21,17 @@ export class TrayController {
 
     this.tray.on('click', () => this.togglePanel())
     this.tray.on('right-click', () => {
-      this.tray?.popUpContextMenu(
-        Menu.buildFromTemplate([
-          { label: '重扫注册表', click: () => void this.manager.rescan() },
-          { type: 'separator' },
-          { label: '退出 Arborist', role: 'quit' }
-        ])
-      )
+      const template: Electron.MenuItemConstructorOptions[] = [
+        { label: '重扫注册表', click: () => void this.manager.rescan() }
+      ]
+      if (this.portalUrl) {
+        template.push({
+          label: '打开门户',
+          click: () => void shell.openExternal(this.portalUrl!)
+        })
+      }
+      template.push({ type: 'separator' }, { label: '退出 Arborist', role: 'quit' })
+      this.tray?.popUpContextMenu(Menu.buildFromTemplate(template))
     })
   }
 

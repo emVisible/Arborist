@@ -18,7 +18,11 @@ if (!app.requestSingleInstanceLock()) {
       tray.start()
 
       startApiServer(manager, manager.apiPort, join(__dirname, '../../resources/portal/index.html'))
-        .then((api) => console.log(`[arborist] api + portal: http://127.0.0.1:${api.port}`))
+        .then((api) => {
+          const url = `http://127.0.0.1:${api.port}`
+          console.log(`[arborist] api + portal: ${url}`)
+          tray.setPortalUrl(url)
+        })
         .catch((e) => console.warn(`[arborist] api/门户已禁用（端口不可用）：${(e as Error).message}`))
     })
   })
