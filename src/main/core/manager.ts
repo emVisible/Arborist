@@ -2,6 +2,7 @@ import { EventEmitter } from 'node:events'
 import { execFile } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { ARBOR_DIR, loadConfig, ConfigError, CONFIG_PATH, type ArborConfig } from './config'
+import { join } from 'node:path'
 import { discoverApps, type Manifest } from './registry'
 import { probeApp, type Probe } from './prober'
 import {
@@ -9,7 +10,8 @@ import {
   killPids,
   pidsOnPort,
   startWeb,
-  stopWeb
+  stopWeb,
+  tailFile
 } from './supervisor'
 import type { AppView, LightState, ListResult } from '../../shared/types'
 
@@ -191,6 +193,12 @@ export class AppManager extends EventEmitter {
     if (!entry) return
     if (entry.m.type === 'web' && entry.m.url) this.opts.openExternal?.(entry.m.url)
     // app / menubar：M4
+  }
+
+  tail(name: string, lines: number): string {
+    const m = this.get(name)
+    if (!m || m.type !== 'web') return ''
+    return tailFile(join(this.opts.baseDir ?? ARBOR_DIR, 'logs', `${m.name}.log`), lines)
   }
 
   openConfig(): void {

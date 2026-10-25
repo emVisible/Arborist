@@ -8,6 +8,7 @@
   "scripts": {
     "icons": "node scripts/gen-icons.mjs",
     "dev": "electron-vite dev",
+    "preview:ui": "vite --config scripts/preview.vite.config.ts",
     "build": "electron-vite build",
     "typecheck": "tsc --noEmit -p tsconfig.node.json && tsc --noEmit -p tsconfig.web.json",
     "test": "vitest run",

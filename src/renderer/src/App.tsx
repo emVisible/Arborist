@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react'
 import type { AppView, ListResult } from '../../shared/types'
+import LogView from './Logs'
 
 const stateLabel: Record<string, string> = {
   stopped: '已停止',
@@ -12,6 +13,19 @@ const stateLabel: Record<string, string> = {
 }
 
 export default function App() {
+  const [hash, setHash] = useState(window.location.hash)
+  useEffect(() => {
+    const onHash = (): void => setHash(window.location.hash)
+    window.addEventListener('hashchange', onHash)
+    return () => window.removeEventListener('hashchange', onHash)
+  }, [])
+
+  const logMatch = hash.match(/^#\/logs\/(.+)$/)
+  if (logMatch) return <LogView name={decodeURIComponent(logMatch[1])} />
+  return <Panel />
+}
+
+function Panel() {
   const [data, setData] = useState<ListResult>({ apps: [], errors: [] })
 
   const refresh = useCallback(() => {
