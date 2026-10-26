@@ -43,19 +43,22 @@ manifest 声明 `branch = "main"` 时，启动前检查 repo 当前 checkout：�
 
 ## 示例
 
-**web — Ametrine**
+**web — Ametrine**（本机实际在跑的一份，2026-10-26 实测）
 
 ```toml
-name  = "ametrine"
-title = "Ametrine"
-type  = "web"
-start = "./dev.sh"
-url   = "http://127.0.0.1:8710"
-ready = "http:/healthz"
+name   = "ametrine"
+title  = "Ametrine"
+type   = "web"
+start  = "./arborist-start.sh"
+url    = "http://127.0.0.1:8000"
+ready  = "http:/api/arbor/status"
 branch = "main"
-icon  = "docs/icon.png"
-notes = "自托管 RAG 工作台"
+icon   = "apps/frontend/public/favicon.png"
+notes  = "本地优先 RAG 知识库。数据层缺席时契约回 degraded 并点名是谁"
 ```
+
+`ready` 指到契约路径而不是首页，是为了堵掉降级链的一条假绿：前端 HTML 一直会回 200，
+后端死了它照样回 200 —— 于是「端口通了」被当成「应用活着」。实现了契约的成员都该这么写。
 
 **app — Hertz**
 

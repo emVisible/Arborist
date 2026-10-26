@@ -6,7 +6,9 @@
 
 Arborist 是主人（emVisible，本地用户 `young`）的个人 app 中控台：常驻 macOS menu bar 的 Electron 应用，管理他自己开发的一批小软件（web 服务 / 桌面应用 / menu bar 守护三类）。它是《The Grove 个人数字生态蓝图》中 Grove 模块的落地形态——中控台先行，浏览器门户已随 v0.2.0 交付。定位一句话：**管点火，不管聚合；产品模式，不是开发模式**。
 
-当前状态：**v0.2.0 完成并已推送**（HEAD 见 `git log`，dmg 在 `release/Arborist-0.2.0-arm64.dmg`）。36 个测试全绿。真实注册表里目前只有 Arborist 自己（自注册），主人尚未给其它 app 放 manifest——这是当前最大的空转点。
+当前状态：**v0.2.0 完成并已推送**（HEAD 见 `git log`，dmg 在 `release/Arborist-0.2.0-arm64.dmg`）。36 个测试全绿。
+
+真实注册表现有 **两个成员**：Arborist 自注册 + **Ametrine**（2026-10-26 接手时接入并活体实测：真 roots 扫描 → 真 prober 走契约分支 → 灯为橙 `degraded`，因为本机只有原生 Postgres 在跑，Redis/Milvus 没起）。Ametrine 侧的改动**尚未提交**，清单见「成员接入」一节。其余活跃 app 的阻塞事实也记在那里——「放个 app.toml 就注册了」对它们并不成立。
 
 ## 架构速览
 
@@ -72,6 +74,8 @@ node scripts/gen-icons.mjs   # 重新生成托盘/应用图标（改图标后必
 3. **git push 到 GitHub 间歇性失败**（HTTP2 framing / 连不上）：重试即可，必要时 `git -c http.version=HTTP/1.1 push`。gh api 可用于探连通性。
 4. **被 SIGKILL 的拷贝版 Apple 签名二进制会卡在 UE（exiting）状态不被回收，pgrep 永远可见**：测试夹具禁止 cp 二进制，用 symlink 指向 `/bin/sleep`（见 `tests/openers.test.ts` 注释）。进程名夹具须 ≤15 字符（p_comm 截断）且带 pid 保证跨运行唯一。
 5. shell 工具的 cwd 可能被重置回 `/Users/young/Code`，命令里显式 `cd /Users/young/Code/Arborist`。
+6. **Vite 在 macOS 把 `localhost` 解析成 IPv6，只监听 `[::1]`**：manifest 写 `http://127.0.0.1:8000` 就必须让前端显式绑 IPv4（`pnpm dev --host=127.0.0.1`；写成 `pnpm dev -- --host=...` 时 pnpm 会把 `--` 原样交给 vite，参数等于没传）。症状是「浏览器打开 localhost:8000 一切正常，中控台灯永远不绿」，2026-10-26 实测踩过。
+7. **Ametrine 冷启动 75–120s**（torch 导入），而启动 watchdog 是 60s（`manager.ts` 的 `opts.startTimeoutMs ?? 60_000`）。所以现在每次点启动都会先显示「启动超时（60s 未就绪）」，再被轮询自愈成橙/绿；而自愈那一刻 `prev` 已不是 `starting`，**「就绪后自动开浏览器」不会发生**。修法要主人定档（per-manifest `start_timeout` vs 抬高默认值），别默默改契约。
 
 ## 主人的生态背景（接活时对齐用）
 
@@ -79,9 +83,30 @@ node scripts/gen-icons.mjs   # 重新生成托盘/应用图标（改图标后必
 - `~/Code` 是源码根（当前 7 个未注册目录）；游戏项目在 `~/Game`。
 - 蓝图（Ginkgo 成就/Pota AI 中台/Canopy 社区/Nexus 笔记/Zap 工具包）大部分未建或放弃，Arborist 只关心"活着的成员"。
 
+## 成员接入（2026-10-26 实测）
+
+**Ametrine 已注册为 web 成员**，改动落在它自己的 repo，**全部未提交**（Ametrine 有主人自己的未提交改动；版本号与 CHANGELOG 的升档是他的事）。五个文件：
+
+- `app.toml`（新增）—— 见 `docs/app-toml.md` 的实例，那份就是这台机器上真的在跑的
+- `arborist-start.sh`（新增，+x）—— 产品入口：前台拉起后端 :3000 与前端 :8000，任一头掉了就整体退出；不装依赖、不跑迁移、不起 Docker（决策 1）。与 `dev.sh`（给人用的 tmux 开发编排）刻意分工
+- `apps/backend/src/system/arbor.py`（新增）—— `GET /api/arbor/status` 契约。两处形状要求破了不会报错、只会静默失效，都写在文件头注释里：默认响应类 `IResponse` 会把 dict 包进 `{code,message,data}` 信封（所以必须显式 `JSONResponse`）；`Depends(get_redis)` 在 Redis 死时自己抛异常变成 500 信封（所以三项检查在函数体内自己做）
+- `apps/backend/main.py`、`apps/backend/src/middleware/tags.py` —— 各一行接线
+
+实测证据（不是我推断的）：以 supervisor 同样的方式（detached 独立进程组 + 日志落盘）跑 `arborist-start.sh` → 3000/8000 起来 → `probeApp()` 返回 `source: 'contract'`、`state: 'degraded'`、line 点名 `redis/milvus` → 组杀后 IPv4 端口无监听、无残留进程。验证用的是临时探针测试，跑完已删，不在树里；重跑办法：把 `discoverApps(['~/Code'])` 与 `probeApp()` 在栈起来时调一次。
+
+**其余活跃成员别按「放个 app.toml 就行」估工**（交接文档上一版就是这么写的）：
+
+| 成员 | 这台机器上的现实 | 还缺 |
+|---|---|---|
+| Hertz | `.app` 只在 `electron/release/mac-arm64/`（2026-09-23 的 v0.30，仓库已 v0.37），未安装；LaunchServices 里 `ai.hertz.app` 指向 `/private/tmp/hertz_dmg_mnt` 一类已消失路径 | 重新构建并安装，或主人改注册方式 |
+| Axiforge | Tauri 桌面从未构建（全仓 0 个 `.app`），只有 `pnpm dev:desktop` | 构建产物 |
+| Thistelles | 源码仓不在本机（uv receipt 指向已删除的 `~/Code/Thistelles`），只有 `/Applications/Thistelles.app` 在跑 | 仓库，或「无仓库的已安装 app」的注册位置 |
+| MiniStat | 同上，只有 `/Applications/MiniStat.app` | 同上 |
+| Ametrine 想真绿 | 需要 Redis 与 Milvus。本机关系库是 Homebrew 原生实例（`.env` 写 `postgresql+asyncpg://young@localhost:5432`），而 compose 想在 5432 起 pgvector 容器 —— **跟原生实例撞端口**，所以启动脚本不碰数据层 | 主人定：数据层以什么方式常驻 |
+
 ## 下一步（按建议优先级）
 
-**主人侧空转点（最优先推动，代码之外）**：给 Ametrine/Hertz/Axiforge/Thistelles 等 repo 放 `app.toml` 注册进真盘子；给 Ametrine 实现 `GET /api/arbor/status`（约半小时，规范见 docs/arbor-status.md）。门户与面板的价值随真实成员数线性上升。
+**待主人定档（上面表格里「还缺」那列都是决定，不是工时）**：数据层常驻方式、没有源码仓的已安装 app 要不要给一个「仅清单」的注册位置、Hertz/Axiforge 是装成品还是换注册方式。
 
 **v0.3 候选（动手前先和主人对齐）**：
 1. `/api/arbor/search` 全局搜索 + 门户搜索框——前置条件：≥3 个成员实现 status 契约。

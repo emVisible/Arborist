@@ -47,6 +47,10 @@ GET /api/arbor/status
 /api/arbor/status（若实现）→ manifest.ready 探测 → 灰灯（未注册探测）
 ```
 
+降级链有个自己不带提示的坑：实现了契约、`ready` 却留在首页的成员，在「前端活着、后端死了」时会**假绿** ——
+契约探测失败后落到 `ready`，而前端照样回 200。所以实现了契约的成员把 `ready` 也写成 `http:/api/arbor/status`，
+让两条探测指向同一个真相。
+
 ## 未来端点（v2 门户，现在不实现）
 
 - `GET /api/arbor/search?q=` — 全局搜索
