@@ -8,7 +8,7 @@ Arborist 是主人（emVisible，本地用户 `young`）的个人 app 中控台�
 
 当前状态：**v0.2.0 已发布**（dmg 在 `release/Arborist-0.2.0-arm64.dmg`），之后有一批**未发版**改动：清单目录（决策 9）、成员接入、门户文案修复、慢启动修复、`start_timeout_ms`。39 个测试全绿，远端已同步。
 
-真实注册表有 **四个成员**：Arborist 自注册 + **Ametrine**（web，橙 `degraded`）+ **Thistelles**（menubar，绿）+ **MiniStat**（menubar，灰）。后两个住新开的「清单目录」`~/.arborist/members/<name>/app.toml`（PROJECT.md 决策 9，零代码改动）；Ametrine 侧的 5 个文件**尚未提交**（主人 repo 里有自己的未提交改动）。细节与实测证据见「成员接入」。
+真实注册表有 **五个成员**：Arborist 自注册 + **Ametrine**（web；栈在跑时契约回 `ok`，绿）+ **Hertz**（app，v0.37.0，repo 内构建经 LaunchServices 注册）+ **Thistelles** / **MiniStat**（menubar，住清单目录）。**v1 验收的「三类 app 各至少一个真实成员」到此满足**；未注册目录剩 5 个（Axiforge、Axis、VisualNovel、_refs、rewind）。Ametrine 侧改动已提交（它自己 repo 的 `9d52dee`）；Hertz 的 `app.toml` 未提交（它 repo 的 AGENTS.md 要求提交前跑 `--quick`，留给主人）。
 
 ## 架构速览
 
@@ -76,14 +76,16 @@ node scripts/gen-icons.mjs   # 重新生成托盘/应用图标（改图标后必
 5. shell 工具的 cwd 可能被重置回 `/Users/young/Code`，命令里显式 `cd /Users/young/Code/Arborist`。
 6. **Vite 在 macOS 把 `localhost` 解析成 IPv6，只监听 `[::1]`**：manifest 写 `http://127.0.0.1:8000` 就必须让前端显式绑 IPv4（`pnpm dev --host=127.0.0.1`；写成 `pnpm dev -- --host=...` 时 pnpm 会把 `--` 原样交给 vite，参数等于没传）。症状是「浏览器打开 localhost:8000 一切正常，中控台灯永远不绿」，2026-10-26 实测踩过。
 7. **Ametrine 冷启动 75–120s**（torch 导入），而缺省启动 watchdog 是 60s（`manager.ts` 的 `opts.startTimeoutMs ?? 60_000`）。已按成员修掉：`app.toml` 的 `start_timeout_ms = 180000` 覆盖缺省，慢启动不再闪「启动超时」；自愈后自动开浏览器的那一半也修了（两条都有用例）。成员的预算自己声明，别抬全局缺省。
+8. **pnpm 虚拟 store 的悬空链接会让 electron-builder 直接失败**（Hertz 实测）：`node_modules/.pnpm/node_modules/@gsap/react` 与 `gsap` 是锁文件里已不存在的旧链，electron-builder 遍历时 ENOENT。确认 `grep -c '@gsap/react' pnpm-lock.yaml` 为 0、且 `find node_modules/.pnpm/node_modules -maxdepth 2 -type l ! -exec test -e {} \; -print` 只报这两条，`rm` 掉即可，不需要 `pnpm install`。
+9. **Ametrine 数据层是三套东西拼的**：原生 Postgres（`.env` 指向 `young@localhost:5432`，用 `brew services start postgresql@18` 起；compose 里的 postgres 会和它撞 5432，**别跑整份 `docker compose up`**）+ compose 的 redis（`docker compose -f apps/database/docker-compose.yml up -d redis`）+ 一个 10/18 建的 embedded Milvus 裸容器（`ametrine-milvus`，ETCD_USE_EMBED + 本地存储，无 compose 标签、不需要 MinIO）。MinIO 镜像在本机镜像源上拉不下来（两个 tag 都 EOF），所以 compose 的 milvus 起不了。Docker Desktop 若不开机自启，Redis/Milvus 重启后缺席，契约会如实回 degraded。
 
 ## 主人的生态背景（接活时对齐用）
 
 - 活跃 app：Ametrine（web，FastAPI，repo 有 dev.sh，正在重构）、Hertz（Electron 桌面平台，最活跃）、Axiforge（Electron）、Ginko（存疑）；menu bar 类：Thistelles、ministat、sidereal-desk。
-- `~/Code` 是源码根（当前 7 个未注册目录）；游戏项目在 `~/Game`。
+- `~/Code` 是源码根（当前 5 个未注册目录：Axiforge、Axis、VisualNovel、_refs、rewind）；游戏项目在 `~/Game`。
 - 蓝图（Ginkgo 成就/Pota AI 中台/Canopy 社区/Nexus 笔记/Zap 工具包）大部分未建或放弃，Arborist 只关心"活着的成员"。
 
-## 成员接入（2026-10-26 实测）
+## 成员接入（2026-10-26 / 11-01 实测）
 
 **Ametrine 已注册为 web 成员**，改动落在它自己的 repo，**全部未提交**（Ametrine 有主人自己的未提交改动；版本号与 CHANGELOG 的升档是他的事）。五个文件：
 
@@ -94,21 +96,23 @@ node scripts/gen-icons.mjs   # 重新生成托盘/应用图标（改图标后必
 
 实测证据（不是我推断的）：以 supervisor 同样的方式（detached 独立进程组 + 日志落盘）跑 `arborist-start.sh` → 3000/8000 起来 → `probeApp()` 返回 `source: 'contract'`、`state: 'degraded'`、line 点名 `redis/milvus` → 组杀后 IPv4 端口无监听、无残留进程。验证用的是临时探针测试，跑完已删，不在树里；重跑办法：把 `discoverApps(['~/Code'])` 与 `probeApp()` 在栈起来时调一次。
 
-**Thistelles / MiniStat 走清单目录接入**（PROJECT.md 决策 9）：`~/.arborist/config.toml` 的 roots 加了 `~/.arborist/members`，两个成员各一份 `app.toml` + 从 `.app` 包 sips 出来的 128px `icon.png`。零代码改动——发现机制本来就只认「root 的第一层子目录里有 app.toml」。同样用真代码路径验过：`loadConfig()` → `discoverApps()` 得到 4 个成员、0 解析错误、未注册 6；`appRunning()` 正反对照：Thistelles（此刻在跑）= true、MiniStat（没跑）= false。**托盘里点一次「重扫」即可看到 4 个成员**（`rescan()` 会重新读 config，不需要重启）。
+**Thistelles / MiniStat 走清单目录接入**（PROJECT.md 决策 9）：`~/.arborist/config.toml` 的 roots 加了 `~/.arborist/members`，两个成员各一份 `app.toml` + 从 `.app` 包 sips 出来的 128px `icon.png`。零代码改动——发现机制本来就只认「root 的第一层子目录里有 app.toml」。同样用真代码路径验过：`loadConfig()` → `discoverApps()` 得到 4 个成员、0 解析错误、未注册 6；`appRunning()` 正反对照：Thistelles（当时在跑）= true、MiniStat（没跑）= false。**托盘里点一次「重扫」即可看到 5 个成员**（`rescan()` 会重新读 config，不需要重启）。
+
+**Hertz（app 类）2026-11-01 接入**：清掉 pnpm 虚拟 store 里两条旧悬空链（环境地雷 8）后 `pnpm --filter hertz-electron build:dir` 出 v0.37.0（1.2GB，含 Python 后端）；`lsregister -f electron/release/mac-arm64/Hertz.app` 让 `ai.hertz.app` 解析到 repo 内构建（旧的 `/private/tmp` 记录被新注册压过）；manifest 用 bundle id 而不是应用名。实测：`open -b ai.hertz.app` rc=0、lsappinfo 在跑与退出两向都对；真 roots 扫描 5 成员 / 0 错误 / 未注册 5。**manifest 未提交**——Hertz 的 AGENTS.md 要求提交前跑 `--quick`，留给主人。
 
 **其余活跃成员别按「放个 app.toml 就行」估工**（交接文档上一版就是这么写的）：
 
 | 成员 | 这台机器上的现实 | 还缺 |
 |---|---|---|
-| Hertz | `.app` 只在 `electron/release/mac-arm64/`（2026-09-23 的 v0.30，仓库已 v0.37），未安装；LaunchServices 里 `ai.hertz.app` 指向 `/private/tmp/hertz_dmg_mnt` 一类已消失路径 | 重新构建并安装，或主人改注册方式 |
+| Hertz | 已接入（2026-11-01）：`pnpm --filter hertz-electron build:dir` 出 v0.37.0 → `lsregister -f` 注册 repo 内包 → manifest 用 `ai.hertz.app` | 实测 `open -b` rc=0、在跑/退出两向都验过；但成品是 repo 内 1.2GB 构建（没装 /Applications），删 `electron/release/` 成员就失效 |
 | Axiforge | Tauri 桌面从未构建（全仓 0 个 `.app`），只有 `pnpm dev:desktop` | 构建产物 |
 | Thistelles | 源码仓不在本机（uv receipt 指向已删除的 `~/Code/Thistelles`），只有 `/Applications` 里的成品在跑 → **已接入清单目录** | 已接入；`open` 必须写 `com.thistelles.app`，因为打包后的进程名是 `PythonRuntime`，`pgrep -x Thistelles` 匹配不到 |
 | MiniStat | 同上 | 已接入（`com.ministat.app`）；没声明 `login`，登录项状态仍归主人自己管 |
-| Ametrine 想真绿 | 需要 Redis 与 Milvus。本机关系库是 Homebrew 原生实例（`.env` 写 `postgresql+asyncpg://young@localhost:5432`），而 compose 想在 5432 起 pgvector 容器 —— **跟原生实例撞端口**，所以启动脚本不碰数据层 | 主人定：数据层以什么方式常驻 |
+| Ametrine 想真绿 | **已绿**：原生 PG（`brew services start postgresql@18`）+ compose redis 容器 + 10/18 就存在的 embedded milvus 容器；契约实测 `{"state":"ok","line":"v0.3.0 · 依赖全部正常"}` | 常驻前提：Docker Desktop 得开机自启（未验证）；Milvus 那只是 `docker run` 建的裸容器，不归 compose 管 |
 
 ## 下一步（按建议优先级）
 
-**待主人定档（上面表格里「还缺」那列都是决定，不是工时）**：数据层常驻方式、Hertz/Axiforge 是装成品还是换注册方式。
+**待主人定档（上面表格里「还缺」那列都是决定，不是工时）**：Axiforge 是否构建成品；数据层常驻（Docker Desktop 开机自启、Milvus 裸容器的归属）；Hertz 是否装进 `/Applications`（现在是 repo 内构建 + LaunchServices 注册）。
 
 **v0.3 候选（动手前先和主人对齐）**：
 1. `/api/arbor/search` 全局搜索 + 门户搜索框——前置条件：≥3 个成员实现 status 契约。

@@ -74,15 +74,17 @@ notes  = "本地优先 RAG 知识库。数据层缺席时契约回 degraded 并�
 `ready` 指到契约路径而不是首页，是为了堵掉降级链的一条假绿：前端 HTML 一直会回 200，
 后端死了它照样回 200 —— 于是「端口通了」被当成「应用活着」。实现了契约的成员都该这么写。
 
-**app — Hertz**
+**app — Hertz**（本机实际在用的一份，2026-11-01 实测）
 
 ```toml
 name  = "hertz"
 title = "Hertz"
 type  = "app"
-open  = "Hertz"
-icon  = "docs/icon.png"
+open  = "ai.hertz.app"
+icon  = "electron/build/icon.png"
 ```
+
+`app` 类不由 Arborist 构建：成品得 repo 自己产出并装/注册好（这里是 `pnpm --filter hertz-electron build:dir` 到 repo 内，再 `lsregister -f` 注册）。`open` 写 bundle id，运行态走 `lsappinfo`；写应用名则走 `pgrep -x`，打包后的进程名未必等于应用名。
 
 **menubar — Thistelles**（住在清单目录，本机实际在用的一份）
 
