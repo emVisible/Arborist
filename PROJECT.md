@@ -57,6 +57,7 @@ Arborist 自己也注册进自己（`type = "menubar"`）——这是 manifest �
 6. **CLI 类 app 不进 v1。** 跑完就退的工具，"启动"这个词不成立；有真实需求再议。
 7. **成员一律平级。** Hertz 等只是注册表里的一行，中控台不为核心成员做特殊逻辑。
 8. **技术栈 Electron。** 复用 ministat 的 electron-vite + TypeScript + electron-builder 套路，Tray / BrowserWindow / child_process 全是最老牌稳定的 API，零 native 模块、运行时依赖仅一个 toml 解析库。代价是 ~200MB 常驻内存，决策时已接受。实现路线见 [PLAN.md](PLAN.md)。
+9. **清单目录：已安装但本机没有源码仓的 app，住 `~/.arborist/members/<name>/app.toml`。** 决策 2 否掉的是「扫描推断」，不是「清单必须住在源码里」——这台机器装着 Thistelles 与 MiniStat，源码仓却不在，按原约定它们永远进不了盘子。做法是把 `~/.arborist/members` 登记成一个 root：发现机制本来就只认「root 的第一层子目录里有 `app.toml`」，**零代码改动**，代价是概念上多了一个住处（只对 `app` / `menubar` 成立，`web` 的 `start` 需要一个真实的 repo 当工作目录）。被否掉的替代：扫 `/Applications` 自动生成清单——那正是决策 2 拒掉的推断式发现，而且从 bundle id 猜不出该管多深。
 
 ## 明确不做（v1）
 

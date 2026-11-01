@@ -1,6 +1,15 @@
 # app.toml — 清单规范
 
-每个想被 Arborist 管理的 app，在自己 repo 的根目录放一个 `app.toml`。这是**唯一的注册方式**——Arborist 不做目录扫描推断。注册成本 30 秒，零误判。
+每个想被 Arborist 管理的 app，放一份 `app.toml` 作为**显式清单**——Arborist 不做目录扫描推断。注册成本 30 秒，零误判。
+
+两个住处，按 app 的形态选：
+
+| 住处 | 用于 |
+|---|---|
+| `<repo>/app.toml` | 有源码仓的成员（三类都行） |
+| `~/.arborist/members/<name>/app.toml` | 本机 `/Applications` 里装着、但源码仓不在这台机器的 app（只适合 `app` / `menubar`，见文末「清单目录」） |
+
+清单目录也要先被登记成一个 root（`config.toml` 的 `roots` 里加 `"~/.arborist/members"`）——发现机制本来就只认「root 的第一层子目录里有 `app.toml`」，多一个住处不需要任何特殊代码路径。
 
 ## 字段
 
@@ -70,12 +79,23 @@ open  = "Hertz"
 icon  = "docs/icon.png"
 ```
 
-**menubar — Thistelles**
+**menubar — Thistelles**（住在清单目录，本机实际在用的一份）
 
 ```toml
 name  = "thistelles"
 title = "Thistelles"
 type  = "menubar"
-open  = "Thistelles"
-login = true
+open  = "com.thistelles.app"
+icon  = "icon.png"
 ```
+
+`open` 写 bundle id 而不是应用名，是因为运行态检测分两条路：应用名走 `pgrep -x`（只认进程名），bundle id 走 `lsappinfo`。Thistelles 打包后的进程名是 `PythonRuntime`，写 `"Thistelles"` 的话灯会永远灰着——而“永远灰”看起来像“没在跑”，不像“检测失灵”。不写 `login` 就不碰登录项：登录项管理要一次性 Automation 授权，不该在登记成员那一刻被顺手触发。
+
+## 清单目录
+
+`~/.arborist/members/<name>/app.toml` 是给「成品装在 `/Applications`、源码仓不在这台机器」的 app 用的。几条边界，都是它的形状决定的：
+
+- 只对 `app` / `menubar` 成立。`web` 类的 `start` 以 repo 根为工作目录，清单目录里没有代码可跑。
+- 它是清单，不是仓库的替身：右键“在 Finder 里显示”指向 `app.toml` 本身，`icon` 也相对这个目录。
+- 图标不必手工做：`sips -s format png --resampleWidth 128 /Applications/Xxx.app/Contents/Resources/*.icns --out icon.png`。
+- 未注册计数只数 roots 里的第一层子目录，所以这个目录里只放「每个都登记好了」的子目录，别往里堆临时东西。

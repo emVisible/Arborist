@@ -8,7 +8,7 @@ Arborist 是主人（emVisible，本地用户 `young`）的个人 app 中控台�
 
 当前状态：**v0.2.0 完成并已推送**（HEAD 见 `git log`，dmg 在 `release/Arborist-0.2.0-arm64.dmg`）。36 个测试全绿。
 
-真实注册表现有 **两个成员**：Arborist 自注册 + **Ametrine**（2026-10-26 接手时接入并活体实测：真 roots 扫描 → 真 prober 走契约分支 → 灯为橙 `degraded`，因为本机只有原生 Postgres 在跑，Redis/Milvus 没起）。Ametrine 侧的改动**尚未提交**，清单见「成员接入」一节。其余活跃 app 的阻塞事实也记在那里——「放个 app.toml 就注册了」对它们并不成立。
+真实注册表有 **四个成员**：Arborist 自注册 + **Ametrine**（web，橙 `degraded`）+ **Thistelles**（menubar，绿）+ **MiniStat**（menubar，灰）。后两个住新开的「清单目录」`~/.arborist/members/<name>/app.toml`（PROJECT.md 决策 9，零代码改动）；Ametrine 侧的 5 个文件**尚未提交**（主人 repo 里有自己的未提交改动）。细节与实测证据见「成员接入」。
 
 ## 架构速览
 
@@ -94,19 +94,21 @@ node scripts/gen-icons.mjs   # 重新生成托盘/应用图标（改图标后必
 
 实测证据（不是我推断的）：以 supervisor 同样的方式（detached 独立进程组 + 日志落盘）跑 `arborist-start.sh` → 3000/8000 起来 → `probeApp()` 返回 `source: 'contract'`、`state: 'degraded'`、line 点名 `redis/milvus` → 组杀后 IPv4 端口无监听、无残留进程。验证用的是临时探针测试，跑完已删，不在树里；重跑办法：把 `discoverApps(['~/Code'])` 与 `probeApp()` 在栈起来时调一次。
 
+**Thistelles / MiniStat 走清单目录接入**（PROJECT.md 决策 9）：`~/.arborist/config.toml` 的 roots 加了 `~/.arborist/members`，两个成员各一份 `app.toml` + 从 `.app` 包 sips 出来的 128px `icon.png`。零代码改动——发现机制本来就只认「root 的第一层子目录里有 app.toml」。同样用真代码路径验过：`loadConfig()` → `discoverApps()` 得到 4 个成员、0 解析错误、未注册 6；`appRunning()` 正反对照：Thistelles（此刻在跑）= true、MiniStat（没跑）= false。**托盘里点一次「重扫」即可看到 4 个成员**（`rescan()` 会重新读 config，不需要重启）。
+
 **其余活跃成员别按「放个 app.toml 就行」估工**（交接文档上一版就是这么写的）：
 
 | 成员 | 这台机器上的现实 | 还缺 |
 |---|---|---|
 | Hertz | `.app` 只在 `electron/release/mac-arm64/`（2026-09-23 的 v0.30，仓库已 v0.37），未安装；LaunchServices 里 `ai.hertz.app` 指向 `/private/tmp/hertz_dmg_mnt` 一类已消失路径 | 重新构建并安装，或主人改注册方式 |
 | Axiforge | Tauri 桌面从未构建（全仓 0 个 `.app`），只有 `pnpm dev:desktop` | 构建产物 |
-| Thistelles | 源码仓不在本机（uv receipt 指向已删除的 `~/Code/Thistelles`），只有 `/Applications/Thistelles.app` 在跑 | 仓库，或「无仓库的已安装 app」的注册位置 |
-| MiniStat | 同上，只有 `/Applications/MiniStat.app` | 同上 |
+| Thistelles | 源码仓不在本机（uv receipt 指向已删除的 `~/Code/Thistelles`），只有 `/Applications` 里的成品在跑 → **已接入清单目录** | 已接入；`open` 必须写 `com.thistelles.app`，因为打包后的进程名是 `PythonRuntime`，`pgrep -x Thistelles` 匹配不到 |
+| MiniStat | 同上 | 已接入（`com.ministat.app`）；没声明 `login`，登录项状态仍归主人自己管 |
 | Ametrine 想真绿 | 需要 Redis 与 Milvus。本机关系库是 Homebrew 原生实例（`.env` 写 `postgresql+asyncpg://young@localhost:5432`），而 compose 想在 5432 起 pgvector 容器 —— **跟原生实例撞端口**，所以启动脚本不碰数据层 | 主人定：数据层以什么方式常驻 |
 
 ## 下一步（按建议优先级）
 
-**待主人定档（上面表格里「还缺」那列都是决定，不是工时）**：数据层常驻方式、没有源码仓的已安装 app 要不要给一个「仅清单」的注册位置、Hertz/Axiforge 是装成品还是换注册方式。
+**待主人定档（上面表格里「还缺」那列都是决定，不是工时）**：数据层常驻方式、Hertz/Axiforge 是装成品还是换注册方式、启动 watchdog 60s 与 Ametrine 冷启动 75–120s 的冲突怎么修（见环境地雷第 7 条）。
 
 **v0.3 候选（动手前先和主人对齐）**：
 1. `/api/arbor/search` 全局搜索 + 门户搜索框——前置条件：≥3 个成员实现 status 契约。
