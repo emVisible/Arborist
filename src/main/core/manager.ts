@@ -322,7 +322,9 @@ export class AppManager extends EventEmitter {
       entry.failStreak = 0
       this.transition(entry, 'running')
       entry.line = p.line
-      if (prev === 'starting' && entry.startedByUs && !entry.browserOpened) {
+      // 不要求 prev === 'starting'：慢应用会先被 watchdog 打成 error，再自己恢复。
+      // 意图是「我们拉起的这一次，第一次可用了就开浏览器」，中途进过 error 不该吞掉它。
+      if (entry.startedByUs && !entry.browserOpened) {
         entry.browserOpened = true
         this.opts.openExternal?.(p.url ?? entry.m.url!)
       }

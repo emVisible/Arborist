@@ -145,4 +145,20 @@ describe('manager web 生命周期', () => {
     await manager.stop('fixture-web')
     await waitFor(() => stateOf(manager) === 'stopped', 5000)
   })
+
+  it('慢启动：watchdog 先报超时，就绪后仍自动开浏览器', async () => {
+    const port = await freePort()
+    const setup = fixtureSetup(`sleep 0.6 && node ${serveFixture} ${port}`, port)
+    const { manager, openExternal } = makeManager(setup.configPath, setup.base, { startTimeoutMs: 300 })
+    await manager.init()
+    await manager.start('fixture-web')
+    await waitFor(() => stateOf(manager) === 'error', 3000)
+    expect(openExternal).not.toHaveBeenCalled()
+
+    await waitFor(() => stateOf(manager) === 'running', 8000)
+    expect(openExternal).toHaveBeenCalledWith(setup.url)
+
+    await manager.stop('fixture-web')
+    await waitFor(() => stateOf(manager) === 'stopped', 5000)
+  })
 })
