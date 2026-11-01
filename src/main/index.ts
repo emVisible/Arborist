@@ -9,13 +9,19 @@ if (!app.requestSingleInstanceLock()) {
   app.quit()
 } else {
   app.whenReady().then(() => {
-    if (process.platform === 'darwin') app.dock?.hide()
+    if (process.platform === 'darwin') {
+      // 打包后是纯菜单栏应用；开发时保留 Dock 图标，否则启动看起来就是「闪一下消失」。
+      if (app.isPackaged) app.dock?.hide()
+      else app.dock?.setIcon(join(__dirname, '../../resources/icon.png'))
+    }
 
     const manager = new AppManager({ openExternal: (url) => void shell.openExternal(url) })
     void manager.init().then(() => {
       registerIpc(manager)
       const tray = new TrayController(manager)
       tray.start()
+      app.on('activate', () => tray.showPanel())
+      if (!app.isPackaged) tray.showPanel()
 
       startApiServer(manager, manager.apiPort, join(__dirname, '../../resources/portal/index.html'))
         .then((api) => {

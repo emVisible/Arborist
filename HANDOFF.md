@@ -57,7 +57,7 @@ tests/              7 文件 40 用例
 ## 常用命令（都在 `/Users/young/Code/Arborist` 下执行）
 
 ```
-pnpm dev            # 源码运行（会真启动 GUI，谨慎在无人值守时用）
+pnpm dev            # 开发运行：保留 Dock 图标并在启动时自动打开面板；打包版仍是纯菜单栏（快捷键兜底）
 pnpm typecheck && pnpm test && pnpm build
 pnpm preview:ui     # 浏览器调 dropdown UI（mock 数据，不起 Electron）
 pnpm preview:portal # 浏览器调门户页（假数据，端口 5178）

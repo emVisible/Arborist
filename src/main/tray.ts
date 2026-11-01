@@ -75,6 +75,26 @@ export class TrayController {
     this.tray.setImage(hasError ? this.alertIcon! : this.normalIcon!)
   }
 
+  // 供 Dock 图标 / 开发启动使用：只开不关，且等 renderer 加载完再显示（避免白屏一闪）
+  showPanel(): void {
+    const panel = this.panel
+    if (!panel) return
+    if (panel.webContents.isLoading()) {
+      // did-finish-load 触发时 isLoading() 还可能短暂为 true，直接递归会再挂一个
+      // 永远等不到的监听；延后一拍再试。
+      panel.webContents.once('did-finish-load', () => setTimeout(() => this.showPanel(), 50))
+      return
+    }
+    if (panel.isVisible()) {
+      panel.focus()
+      return
+    }
+    // 从后台进程（dev 启动、全局快捷键）唤出时，macOS 默认不把焦点给后台 app，
+    // 面板会立刻 blur 隐藏 —— 看起来就是「闪一下就没了」。这里显式抢一次。
+    app.focus({ steal: true })
+    this.togglePanel()
+  }
+
   private togglePanel(): void {
     const panel = this.panel
     const tray = this.tray
