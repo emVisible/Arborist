@@ -1,4 +1,4 @@
-import { BrowserWindow, Menu, Tray, nativeImage, screen, shell } from 'electron'
+import { app, BrowserWindow, Menu, Tray, globalShortcut, nativeImage, screen, shell } from 'electron'
 import type { NativeImage } from 'electron'
 import { join } from 'node:path'
 import { createPanelWindow } from './window'
@@ -55,6 +55,15 @@ export class TrayController {
       template.push({ type: 'separator' }, { label: '退出 Arborist', role: 'quit' })
       this.tray?.popUpContextMenu(Menu.buildFromTemplate(template))
     })
+
+    // 菜单栏满时状态项会被系统挤到刘海下面，且不报任何错——快捷键是兜底入口。
+    const accel = this.manager.hotkey
+    if (globalShortcut.register(accel, () => this.togglePanel())) {
+      console.log(`[arborist] hotkey: ${accel}`)
+    } else {
+      console.warn(`[arborist] 全局快捷键 ${accel} 注册失败（可能被其他 app 占用）`)
+    }
+    app.on('will-quit', () => globalShortcut.unregisterAll())
   }
 
   // 任一 app 进入 error 时托盘切红点告警，恢复后切回

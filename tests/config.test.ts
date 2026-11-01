@@ -2,7 +2,7 @@ import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { homedir, tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { ConfigError, expandTilde, loadConfig } from '../src/main/core/config'
+import { ConfigError, DEFAULT_HOTKEY, expandTilde, loadConfig } from '../src/main/core/config'
 
 const dirs: string[] = []
 
@@ -23,7 +23,18 @@ describe('loadConfig', () => {
     const cfg = loadConfig(join(dir, 'config.toml'))
     expect(cfg.pollIntervalMs).toBe(10000)
     expect(cfg.roots).toEqual([join(homedir(), 'Code')])
+    expect(cfg.hotkey).toBe(DEFAULT_HOTKEY)
     expect(readFileSync(join(dir, 'config.toml'), 'utf8')).toContain('roots')
+  })
+
+  it('hotkey 可覆盖，空值报错', () => {
+    const dir = tmp()
+    writeFileSync(join(dir, 'config.toml'), 'roots = []\nhotkey = "CommandOrControl+Shift+A"\n')
+    expect(loadConfig(join(dir, 'config.toml')).hotkey).toBe('CommandOrControl+Shift+A')
+
+    const bad = tmp()
+    writeFileSync(join(bad, 'config.toml'), 'roots = []\nhotkey = "  "\n')
+    expect(() => loadConfig(join(bad, 'config.toml'))).toThrow(ConfigError)
   })
 
   it('解析合法配置并展开 ~', () => {

@@ -1,7 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { execFile } from 'node:child_process'
 import { readFileSync } from 'node:fs'
-import { ARBOR_DIR, loadConfig, ConfigError, CONFIG_PATH, type ArborConfig } from './config'
+import { ARBOR_DIR, loadConfig, ConfigError, CONFIG_PATH, DEFAULT_HOTKEY, type ArborConfig } from './config'
 import { join } from 'node:path'
 import { discoverApps, type Manifest } from './registry'
 import { probeApp, type Probe } from './prober'
@@ -47,7 +47,7 @@ export interface AppEntry {
 }
 
 export class AppManager extends EventEmitter {
-  private config: ArborConfig = { roots: [], pollIntervalMs: 10000, port: 8790 }
+  private config: ArborConfig = { roots: [], pollIntervalMs: 10000, port: 8790, hotkey: DEFAULT_HOTKEY }
   private entries = new Map<string, AppEntry>()
   private errors: { repoDir: string; message: string }[] = []
   private configError: string | undefined
@@ -126,6 +126,10 @@ export class AppManager extends EventEmitter {
 
   get apiPort(): number {
     return this.config.port
+  }
+
+  get hotkey(): string {
+    return this.config.hotkey
   }
 
   async start(name: string): Promise<void> {

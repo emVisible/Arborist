@@ -38,7 +38,7 @@ pnpm dist        # → release/Arborist-0.2.0-arm64.dmg
 
 1. 首次启动会生成 `~/.arborist/config.toml`——把 `roots` 配成你的 repo 所在目录（默认 `["~/Code"]`）。
 2. 在这些目录下的任意 repo 根目录放一个 `app.toml`（[规范](docs/app-toml.md)）。本机装着、源码仓却不在这台机器上的 app，可以改住 `~/.arborist/members/<name>/app.toml`——把这个目录登记成一个 root，其余一切不变。
-3. 点击托盘图标：左键一行启动/打开；右键有停止、日志、Finder、登录项。
+3. 点击托盘图标：左键一行启动/打开；右键有停止、日志、Finder、登录项。菜单栏放不下时图标会被挤到刘海下——按 `⌥⌘A`（config 的 `hotkey` 可改）随时唤出面板。
 
 实现了 [`/api/arbor/status`](docs/arbor-status.md) 的成员 app 状态灯显示"自报健康 + 一行状态"，否则降级为端口探测（实现约 30 分钟）。
 

@@ -6,7 +6,7 @@
 
 Arborist 是主人（emVisible，本地用户 `young`）的个人 app 中控台：常驻 macOS menu bar 的 Electron 应用，管理他自己开发的一批小软件（web 服务 / 桌面应用 / menu bar 守护三类）。它是《The Grove 个人数字生态蓝图》中 Grove 模块的落地形态——中控台先行，浏览器门户已随 v0.2.0 交付。定位一句话：**管点火，不管聚合；产品模式，不是开发模式**。
 
-当前状态：**v0.2.0 已发布**（dmg 在 `release/Arborist-0.2.0-arm64.dmg`），之后有一批**未发版**改动：清单目录（决策 9）、成员接入、门户文案修复、慢启动修复、`start_timeout_ms`。39 个测试全绿，远端已同步。
+当前状态：**v0.2.0 已发布**（dmg 在 `release/Arborist-0.2.0-arm64.dmg`），之后有一批**未发版**改动：清单目录（决策 9）、成员接入、门户文案修复、慢启动修复、`start_timeout_ms`、全局快捷键。40 个测试全绿，远端已同步。
 
 真实注册表有 **五个成员**：Arborist 自注册 + **Ametrine**（web；栈在跑时契约回 `ok`，绿）+ **Hertz**（app，v0.37.0，repo 内构建经 LaunchServices 注册）+ **Thistelles** / **MiniStat**（menubar，住清单目录）。**v1 验收的「三类 app 各至少一个真实成员」到此满足**；未注册目录剩 5 个（Axiforge、Axis、VisualNovel、_refs、rewind）。Ametrine 侧改动已提交（它自己 repo 的 `9d52dee`）；Hertz 的 `app.toml` 未提交（它 repo 的 AGENTS.md 要求提交前跑 `--quick`，留给主人）。
 
@@ -29,7 +29,7 @@ src/shared/types.ts 前后端共享类型
 resources/portal/   门户页（无构建单文件 HTML，时间氛围主题）
 scripts/            gen-icons.mjs（零依赖 PNG 编码器）/ preview 两件套
 fixtures/           spawn-tree.sh / serve.mjs（集成测试夹具）
-tests/              7 文件 39 用例
+tests/              7 文件 40 用例
 ```
 
 数据流：registry 发现 → manager 持状态机 → poll 驱动灯色 → 事件 `update`/`refresh` 广播到托盘面板与门户。状态不持久化（认领 = 重启后重新轮询）。
@@ -78,6 +78,7 @@ node scripts/gen-icons.mjs   # 重新生成托盘/应用图标（改图标后必
 7. **Ametrine 冷启动 75–120s**（torch 导入），而缺省启动 watchdog 是 60s（`manager.ts` 的 `opts.startTimeoutMs ?? 60_000`）。已按成员修掉：`app.toml` 的 `start_timeout_ms = 180000` 覆盖缺省，慢启动不再闪「启动超时」；自愈后自动开浏览器的那一半也修了（两条都有用例）。成员的预算自己声明，别抬全局缺省。
 8. **pnpm 虚拟 store 的悬空链接会让 electron-builder 直接失败**（Hertz 实测）：`node_modules/.pnpm/node_modules/@gsap/react` 与 `gsap` 是锁文件里已不存在的旧链，electron-builder 遍历时 ENOENT。确认 `grep -c '@gsap/react' pnpm-lock.yaml` 为 0、且 `find node_modules/.pnpm/node_modules -maxdepth 2 -type l ! -exec test -e {} \; -print` 只报这两条，`rm` 掉即可，不需要 `pnpm install`。
 9. **Ametrine 数据层是三套东西拼的**：原生 Postgres（`.env` 指向 `young@localhost:5432`，用 `brew services start postgresql@18` 起；compose 里的 postgres 会和它撞 5432，**别跑整份 `docker compose up`**）+ compose 的 redis（`docker compose -f apps/database/docker-compose.yml up -d redis`）+ 一个 10/18 建的 embedded Milvus 裸容器（`ametrine-milvus`，ETCD_USE_EMBED + 本地存储，无 compose 标签、不需要 MinIO）。MinIO 镜像在本机镜像源上拉不下来（两个 tag 都 EOF），所以 compose 的 milvus 起不了。Docker Desktop 若不开机自启，Redis/Milvus 重启后缺席，契约会如实回 degraded。
+10. **菜单栏满时状态项会被挤到刘海下，系统不报错**（2026-11-01 实测）：`Tray.getBounds()` 量到 `{x:713,y:0,w:32,h:37}`（屏宽 1470，正中是刘海），图标完全不可见；临时退掉 Thistelles 让出一格，树图标立刻出现在最左侧。兜底入口是全局快捷键 `⌥⌘A`（config 的 `hotkey`，改完重启生效）。排查这类"应用没反应"还要看单实例锁：旧实例没退干净时再跑 `pnpm dev` 会静默退出、终端什么都不报。
 
 ## 主人的生态背景（接活时对齐用）
 

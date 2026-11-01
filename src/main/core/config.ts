@@ -7,7 +7,10 @@ export interface ArborConfig {
   roots: string[]
   pollIntervalMs: number
   port: number
+  hotkey: string
 }
+
+export const DEFAULT_HOTKEY = 'CommandOrControl+Alt+A'
 
 export const ARBOR_DIR = join(homedir(), '.arborist')
 export const CONFIG_PATH = join(ARBOR_DIR, 'config.toml')
@@ -20,9 +23,11 @@ const TEMPLATE = `# Arborist 配置
 # roots: 在这些目录的第一层子目录里寻找 app.toml
 # poll_interval_ms: web 类 app 的状态轮询间隔
 # port: 本地 API 与门户端口（仅 127.0.0.1）
+# hotkey: 全局快捷键（Electron accelerator），菜单栏图标被挤掉时也能唤出面板；改完重启生效
 roots = ["~/Code"]
 poll_interval_ms = 10000
 port = 8790
+hotkey = "${DEFAULT_HOTKEY}"
 `
 
 export function expandTilde(p: string): string {
@@ -35,7 +40,7 @@ export function loadConfig(configPath = CONFIG_PATH): ArborConfig {
   if (!existsSync(configPath)) {
     mkdirSync(dirname(configPath), { recursive: true })
     writeFileSync(configPath, TEMPLATE)
-    return { roots: [expandTilde('~/Code')], pollIntervalMs: 10000, port: 8790 }
+    return { roots: [expandTilde('~/Code')], pollIntervalMs: 10000, port: 8790, hotkey: DEFAULT_HOTKEY }
   }
 
   let raw: unknown
@@ -68,5 +73,10 @@ export function loadConfig(configPath = CONFIG_PATH): ArborConfig {
     throw new ConfigError('port 必须是 1024–65535 的整数')
   }
 
-  return { roots: roots.map(expandTilde), pollIntervalMs: poll, port }
+  const hotkey = t.hotkey ?? DEFAULT_HOTKEY
+  if (typeof hotkey !== 'string' || !hotkey.trim()) {
+    throw new ConfigError('hotkey 必须是非空字符串（Electron accelerator，如 CommandOrControl+Alt+A）')
+  }
+
+  return { roots: roots.map(expandTilde), pollIntervalMs: poll, port, hotkey }
 }
