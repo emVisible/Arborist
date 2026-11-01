@@ -131,6 +131,24 @@ describe('parseManifest', () => {
     }
   })
 
+  it('start_timeout_ms 缺省为空，合法值透传，非法值报错', () => {
+    const base = 'name = "x"\ntype = "web"\nstart = "s"\nurl = "http://127.0.0.1:1"\n'
+
+    const plain = repo(root(), 'r', base)
+    const r0 = parseManifest(join(plain, 'app.toml'), plain)
+    expect('manifest' in r0 ? r0.manifest.startTimeoutMs : 'x').toBeUndefined()
+
+    const ok = repo(root(), 'r', base + 'start_timeout_ms = 180000\n')
+    const r1 = parseManifest(join(ok, 'app.toml'), ok)
+    expect('manifest' in r1 ? r1.manifest.startTimeoutMs : null).toBe(180000)
+
+    for (const bad of ['0', '999', '1.5', '"180000"']) {
+      const dir = repo(root(), 'r', base + `start_timeout_ms = ${bad}\n`)
+      const r = parseManifest(join(dir, 'app.toml'), dir)
+      expect('error' in r && r.error).toContain('start_timeout_ms')
+    }
+  })
+
   it('icon 存在时解析为绝对路径，不存在时忽略', () => {
     const withIcon = repo(root(), 'r', APP + 'icon = "docs/icon.png"\n')
     mkdirSync(join(withIcon, 'docs'))

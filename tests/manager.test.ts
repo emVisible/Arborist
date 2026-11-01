@@ -161,4 +161,19 @@ describe('manager web 生命周期', () => {
     await manager.stop('fixture-web')
     await waitFor(() => stateOf(manager) === 'stopped', 5000)
   })
+
+  it('start_timeout_ms 按成员取：manifest 值压过全局 opts', async () => {
+    const port = await freePort()
+    // manifest 声明 1.2s、全局给 6s：若读的是全局，3s 内根本不会出现「超时」
+    const setup = fixtureSetup('sleep 30', port, 'start_timeout_ms = 1200\n')
+    const { manager } = makeManager(setup.configPath, setup.base, { startTimeoutMs: 6000 })
+    await manager.init()
+    await manager.start('fixture-web')
+    await waitFor(() => stateOf(manager) === 'error', 3000)
+    const app = manager.list().apps.find((a) => a.name === 'fixture-web')
+    expect(app?.line).toContain('1s')
+
+    await manager.stop('fixture-web')
+    await waitFor(() => stateOf(manager) === 'stopped', 5000)
+  })
 })

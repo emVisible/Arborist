@@ -169,7 +169,7 @@ export class AppManager extends EventEmitter {
     this.transition(entry, 'starting')
     entry.line = undefined
 
-    const timeoutMs = this.opts.startTimeoutMs ?? 60_000
+    const timeoutMs = entry.m.startTimeoutMs ?? this.opts.startTimeoutMs ?? 60_000
     clearTimeout(entry.timeoutTimer)
     entry.timeoutTimer = setTimeout(() => {
       if (entry.state === 'starting') {

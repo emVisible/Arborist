@@ -21,6 +21,7 @@
 | `start` | string | web | ✅ | 启动命令，工作目录为 repo 根 |
 | `url` | string | web | ✅ | 服务地址，就绪后在默认浏览器打开 |
 | `ready` | string | web | — | 就绪探测，缺省 `http:/` |
+| `start_timeout_ms` | number | web | — | 启动就绪预算（毫秒，≥1000），缺省 60000。冷启动慢的成员按实测调大 |
 | `branch` | string | web | — | 限定启动分支（产品模式纪律），缺省不检查 |
 | `open` | string | app / menubar | ✅ | 传给 `open -a` 的应用名或 bundle id |
 | `login` | bool | menubar | — | 由 Arborist 统一管理 login item |
@@ -61,10 +62,14 @@ type   = "web"
 start  = "./arborist-start.sh"
 url    = "http://127.0.0.1:8000"
 ready  = "http:/api/arbor/status"
+start_timeout_ms = 180000
 branch = "main"
 icon   = "apps/frontend/public/favicon.png"
 notes  = "本地优先 RAG 知识库。数据层缺席时契约回 degraded 并点名是谁"
 ```
+
+`start_timeout_ms` 是实测出来的：Ametrine 冷启动要 75–120s（torch 导入），而缺省预算 60s ——
+不声明的话每次启动都会先闪一条「启动超时」，再靠轮询自愈。慢成员按自己的实测值声明，别抬全局缺省。
 
 `ready` 指到契约路径而不是首页，是为了堵掉降级链的一条假绿：前端 HTML 一直会回 200，
 后端死了它照样回 200 —— 于是「端口通了」被当成「应用活着」。实现了契约的成员都该这么写。

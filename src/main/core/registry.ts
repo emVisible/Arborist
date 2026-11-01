@@ -13,6 +13,7 @@ export interface Manifest {
   url?: string
   ready?: string
   branch?: string
+  startTimeoutMs?: number
   open?: string
   login?: boolean
   iconPath?: string
@@ -117,6 +118,15 @@ export function parseManifest(
     return { error: 'ready 只接受 "http:/path"、绝对 URL 或 "tcp"' }
   }
 
+  let startTimeoutMs: number | undefined
+  if (t.start_timeout_ms !== undefined) {
+    const v = t.start_timeout_ms
+    if (typeof v !== 'number' || !Number.isFinite(v) || !Number.isInteger(v) || v < 1000) {
+      return { error: 'start_timeout_ms 必须是 ≥1000 的整数（毫秒）' }
+    }
+    startTimeoutMs = v
+  }
+
   let iconPath: string | undefined
   if (typeof t.icon === 'string' && t.icon) {
     const p = join(repoDir, t.icon)
@@ -135,6 +145,7 @@ export function parseManifest(
       url,
       ready: ready ?? (appType === 'web' ? 'http:/' : undefined),
       branch: str(t.branch),
+      startTimeoutMs,
       open,
       login: t.login === true,
       iconPath,
