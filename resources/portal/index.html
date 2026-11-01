@@ -162,7 +162,7 @@
               '<div class="card-top">' + iconHtml(a) +
               '<span class="card-title">' + esc(a.title) + '</span>' +
               '<span class="card-tag">' + a.type + '</span></div>' +
-              '<div class="card-sub">' + esc(a.line || stateLabel[a.state] || '') + '</div>' +
+              '<div class="card-sub">' + esc(a.line || '') + '</div>' +
               '<div class="card-foot"><span class="dot ' + a.state + '"></span>' + stateLabel[a.state] + '</div>' +
               '</div>'
           })
