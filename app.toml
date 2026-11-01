@@ -3,4 +3,5 @@ title = "Arborist"
 type  = "menubar"
 open  = "Arborist"
 login = true
+icon  = "resources/icon.png"
 notes = "自己管自己"
