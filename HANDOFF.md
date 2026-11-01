@@ -6,7 +6,7 @@
 
 Arborist 是主人（emVisible，本地用户 `young`）的个人 app 中控台：常驻 macOS menu bar 的 Electron 应用，管理他自己开发的一批小软件（web 服务 / 桌面应用 / menu bar 守护三类）。它是《The Grove 个人数字生态蓝图》中 Grove 模块的落地形态——中控台先行，浏览器门户已随 v0.2.0 交付。定位一句话：**管点火，不管聚合；产品模式，不是开发模式**。
 
-当前状态：**v0.2.0 完成并已推送**（HEAD 见 `git log`，dmg 在 `release/Arborist-0.2.0-arm64.dmg`）。36 个测试全绿。
+当前状态：**v0.2.0 完成并已推送**（HEAD 见 `git log`，dmg 在 `release/Arborist-0.2.0-arm64.dmg`）。37 个测试全绿。
 
 真实注册表有 **四个成员**：Arborist 自注册 + **Ametrine**（web，橙 `degraded`）+ **Thistelles**（menubar，绿）+ **MiniStat**（menubar，灰）。后两个住新开的「清单目录」`~/.arborist/members/<name>/app.toml`（PROJECT.md 决策 9，零代码改动）；Ametrine 侧的 5 个文件**尚未提交**（主人 repo 里有自己的未提交改动）。细节与实测证据见「成员接入」。
 
@@ -29,7 +29,7 @@ src/shared/types.ts 前后端共享类型
 resources/portal/   门户页（无构建单文件 HTML，时间氛围主题）
 scripts/            gen-icons.mjs（零依赖 PNG 编码器）/ preview 两件套
 fixtures/           spawn-tree.sh / serve.mjs（集成测试夹具）
-tests/              7 文件 36 用例
+tests/              7 文件 37 用例
 ```
 
 数据流：registry 发现 → manager 持状态机 → poll 驱动灯色 → 事件 `update`/`refresh` 广播到托盘面板与门户。状态不持久化（认领 = 重启后重新轮询）。
@@ -75,7 +75,7 @@ node scripts/gen-icons.mjs   # 重新生成托盘/应用图标（改图标后必
 4. **被 SIGKILL 的拷贝版 Apple 签名二进制会卡在 UE（exiting）状态不被回收，pgrep 永远可见**：测试夹具禁止 cp 二进制，用 symlink 指向 `/bin/sleep`（见 `tests/openers.test.ts` 注释）。进程名夹具须 ≤15 字符（p_comm 截断）且带 pid 保证跨运行唯一。
 5. shell 工具的 cwd 可能被重置回 `/Users/young/Code`，命令里显式 `cd /Users/young/Code/Arborist`。
 6. **Vite 在 macOS 把 `localhost` 解析成 IPv6，只监听 `[::1]`**：manifest 写 `http://127.0.0.1:8000` 就必须让前端显式绑 IPv4（`pnpm dev --host=127.0.0.1`；写成 `pnpm dev -- --host=...` 时 pnpm 会把 `--` 原样交给 vite，参数等于没传）。症状是「浏览器打开 localhost:8000 一切正常，中控台灯永远不绿」，2026-10-26 实测踩过。
-7. **Ametrine 冷启动 75–120s**（torch 导入），而启动 watchdog 是 60s（`manager.ts` 的 `opts.startTimeoutMs ?? 60_000`）。所以现在每次点启动都会先显示「启动超时（60s 未就绪）」，再被轮询自愈成橙/绿；而自愈那一刻 `prev` 已不是 `starting`，**「就绪后自动开浏览器」不会发生**。修法要主人定档（per-manifest `start_timeout` vs 抬高默认值），别默默改契约。
+7. **Ametrine 冷启动 75–120s**（torch 导入），而启动 watchdog 是 60s（`manager.ts` 的 `opts.startTimeoutMs ?? 60_000`）。所以现在每次点启动都会先显示「启动超时（60s 未就绪）」，再被轮询自愈成橙/绿。自愈时 `prev` 已不是 `starting` 导致不开浏览器的那一半**已修**（带用例，见 git log 的 manager fix）；剩下的「每次启动先闪一下超时红字」要主人定档（per-manifest `start_timeout` vs 抬高默认值），别默默改契约。
 
 ## 主人的生态背景（接活时对齐用）
 
