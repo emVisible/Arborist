@@ -6,7 +6,7 @@
 
 Arborist 是主人（emVisible，本地用户 `young`）的个人 app 中控台：常驻 macOS menu bar 的 Electron 应用，管理他自己开发的一批小软件（web 服务 / 桌面应用 / menu bar 守护三类）。它是《The Grove 个人数字生态蓝图》中 Grove 模块的落地形态——中控台先行，浏览器门户已随 v0.2.0 交付。定位一句话：**管点火，不管聚合；产品模式，不是开发模式**。
 
-当前状态：**v0.2.0 已发布**（dmg 在 `release/Arborist-0.2.0-arm64.dmg`），之后有一批**未发版**改动：清单目录（决策 9）、成员接入、门户文案修复、慢启动修复、`start_timeout_ms`、全局快捷键。40 个测试全绿，远端已同步。
+当前状态：**v0.2.1 已发布**（dmg 在 `release/Arborist-0.2.1-arm64.dmg`）：0.2.0 之后的清单目录（决策 9）、成员接入、慢启动修复、`start_timeout_ms`、全局快捷键、自身图标均已落版。40 个测试全绿。
 
 真实注册表有 **五个成员**：Arborist 自注册 + **Ametrine**（web；栈在跑时契约回 `ok`，绿）+ **Hertz**（app，v0.37.0，repo 内构建经 LaunchServices 注册）+ **Thistelles** / **MiniStat**（menubar，住清单目录）。**v1 验收的「三类 app 各至少一个真实成员」到此满足**；未注册目录剩 5 个（Axiforge、Axis、VisualNovel、_refs、rewind）。Ametrine 侧改动已提交（它自己 repo 的 `9d52dee`）；Hertz 的 `app.toml` 未提交（它 repo 的 AGENTS.md 要求提交前跑 `--quick`，留给主人）。
 

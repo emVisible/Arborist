@@ -6,7 +6,7 @@ A resident macOS menu-bar control center for my personal apps: one manifest per 
 
 I build a lot of small tools. Each one grew its own ad-hoc entry point — `dev.sh`, `start.sh`, `webui.sh`, a Makefile, or plain muscle memory in a shell history. Arborist replaces all of that with one convention: every repo that wants to be managed drops an `app.toml` at its root, and Arborist takes it from there.
 
-Status: **v0.2.0** — control center, local API and the browser portal are shipped; milestones and acceptance criteria in [PLAN.md](PLAN.md).
+Status: **v0.2.1** — control center, local API and the browser portal are shipped; milestones and acceptance criteria in [PLAN.md](PLAN.md).
 
 ## Documents
 
@@ -29,7 +29,7 @@ Not on purpose: auto-discovery by scanning directories, environment building / d
 
 ```sh
 pnpm install
-pnpm dist        # → release/Arborist-0.2.0-arm64.dmg
+pnpm dist        # → release/Arborist-0.2.1-arm64.dmg
 ```
 
 Or run from source: `pnpm dev`. Tweak the dropdown UI in a plain browser without Electron: `pnpm preview:ui`.
