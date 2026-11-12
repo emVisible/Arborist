@@ -190,3 +190,41 @@ Arborist 自己的 app.toml（`type = "menubar"`，自注册）；Ametrine 实�
 版本 0.2.0、CHANGELOG、README/PROJECT/PLAN 对齐、dmg、打包后端到端冒烟（启动 → curl `/api/apps` 带 X-Arbor 头 → 门户 HTML → 杀进程）。
 
 **v0.2.0 完成定义**：M6–M9 全过 + 冒烟通过 + 门户在日常浏览器里挂一周不掉线。
+
+---
+
+# v0.3.0 · 端口诚实（M10–M12）
+
+主题：「启动」这个动作对端口诚实——已在运行就认领，端口被占就立刻说清楚，不再盲目 spawn 后等超时；门户端口被占也不再是静默的 console 日志。
+
+## M10 · 启动前体检（0.5d）
+
+现状：`start()` 不看端口直接 spawn。三种坏情况：外部已在跑 → 双开且被旧实例的探测点亮；无关进程占端口 → 白等 60–180s 超时才报错；残留实例占端口 → 面板停在 stopped，看起来无从下手。
+
+行为（`start()` 的 branch 检查之后、spawn 之前）：
+
+1. 取 manifest `url` 的端口（缺省按 http 80 / https 443）。端口空闲 → 原 spawn 路径不变。
+2. 端口有监听 → `probeApp` 一次：
+   - 契约/ready 可用（`ok` / `degraded`）→ 认领：进 running/degraded，用契约 line，开一次浏览器，不 spawn。
+   - 契约 `starting` → 进 starting，挂正常 watchdog，不 spawn。
+   - 契约 `error` → blocked，line 用契约 line，不 spawn（进程活着但自报不可用，先停再启）。
+   - 探测不通 → blocked，line 点名端口与占用 PID/命令，不 spawn。
+3. 清理出路复用既有 `stop()`：blocked ≠ stopped，右键停止会走「pidfile 不在 → 端口兜底击杀」。
+
+验收：
+- 外部已就绪服务 + 点击启动 → running、开浏览器、无 pidfile（未 spawn）
+- 哑监听占住端口 + 点击启动 → 2s 内 blocked，line 含端口与占用 PID，无 pidfile
+- 端口空闲 → 既有 start→running 用例不回归
+- 以上进 manager 集成测试
+
+## M11 · 门户端口失败可见（0.5d）
+
+`127.0.0.1:8790` 被占时当前只 `console.warn`，打包后不可见。`ListResult` 增加 `apiError`，API 启动失败时写入；面板顶部 banner 展示（门户不可用但面板正常——壳核分离不变）。
+
+验收：占住 8790 启动 Arborist → 面板出现带原因的 banner，托盘面板其余功能正常；`setApiError` 进单测。
+
+## M12 · 收尾（0.5d）
+
+版本 0.3.0、CHANGELOG、README 双语、HANDOFF、dmg、打包后端到端冒烟、验收三件套。
+
+**v0.3.0 完成定义**：M10–M12 全过；Ametrine 在「已在跑 / 端口被占 / 正常启动」三种现场行为符合 M10 验收。

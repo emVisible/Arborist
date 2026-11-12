@@ -29,7 +29,11 @@ if (!app.requestSingleInstanceLock()) {
           console.log(`[arborist] api + portal: ${url}`)
           tray.setPortalUrl(url)
         })
-        .catch((e) => console.warn(`[arborist] api/门户已禁用（端口不可用）：${(e as Error).message}`))
+        .catch((e) => {
+          const message = `门户/API 未启动（端口 ${manager.apiPort} 不可用）：${(e as Error).message}`
+          console.warn(`[arborist] ${message}`)
+          manager.setApiError(message)
+        })
     })
   })
 

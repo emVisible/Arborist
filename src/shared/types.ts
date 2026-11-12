@@ -28,6 +28,7 @@ export interface ListResult {
   apps: AppView[]
   errors: ManifestError[]
   configError?: string
+  apiError?: string
   unregisteredCount?: number
 }
 

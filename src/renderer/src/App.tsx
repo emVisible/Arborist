@@ -68,6 +68,8 @@ function Panel() {
 
       {data.configError && <div className="banner error">{data.configError}</div>}
 
+      {data.apiError && <div className="banner warn">{data.apiError}</div>}
+
       {data.errors.length > 0 && (
         <div className="banner warn">
           {data.errors.map((e, i) => (

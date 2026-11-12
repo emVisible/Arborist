@@ -98,6 +98,32 @@ export function pidsOnPort(port: number): Promise<number[]> {
   })
 }
 
+export function portOf(url: string): number {
+  const u = new URL(url)
+  return Number(u.port) || (u.protocol === 'https:' ? 443 : 80)
+}
+
+// 端口占用诊断：PID 之外再带命令名，面板那一行才可操作。
+export function pidLabels(pids: number[]): Promise<string> {
+  return new Promise((resolve) => {
+    execFile(
+      'ps',
+      ['-o', 'pid=,comm=', '-p', pids.join(',')],
+      { timeout: 2000 },
+      (err, stdout) => {
+        if (err || !stdout.trim()) return resolve(pids.join(', '))
+        resolve(
+          stdout
+            .trim()
+            .split('\n')
+            .map((l) => l.trim().replace(/\s+/, ' '))
+            .join(', ')
+        )
+      }
+    )
+  })
+}
+
 export async function killPids(pids: number[]): Promise<void> {
   for (const pid of pids) {
     try {

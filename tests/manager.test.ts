@@ -1,6 +1,7 @@
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
-import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -12,10 +13,16 @@ const sh = promisify(execFile)
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
 const serveFixture = join(repoRoot, 'fixtures/serve.mjs')
 
-const junk: { dirs: string[]; managers: AppManager[]; children: ReturnType<typeof spawn>[] } = {
+const junk: {
+  dirs: string[]
+  managers: AppManager[]
+  children: ReturnType<typeof spawn>[]
+  servers: Server[]
+} = {
   dirs: [],
   managers: [],
-  children: []
+  children: [],
+  servers: []
 }
 
 function tmp(): string {
@@ -71,6 +78,7 @@ function stateOf(m: AppManager): string | undefined {
 afterEach(() => {
   for (const m of junk.managers.splice(0)) m.dispose()
   for (const c of junk.children.splice(0)) c.kill('SIGKILL')
+  for (const s of junk.servers.splice(0)) s.close()
   for (const d of junk.dirs.splice(0)) rmSync(d, { recursive: true, force: true })
 })
 
@@ -113,6 +121,61 @@ describe('manager web 生命周期', () => {
       () => new Promise<boolean>((r) => fetch(setup.url).then(() => r(false), () => r(true))),
       5000
     )
+  })
+
+  it('start 时服务已在跑：认领、不 spawn、开浏览器', async () => {
+    const port = await freePort()
+    const setup = fixtureSetup(`node ${serveFixture} ${port}`, port)
+    const child = spawn('node', [serveFixture, String(port)], { stdio: 'ignore' })
+    junk.children.push(child)
+    await waitFor(
+      () => new Promise<boolean>((r) => fetch(setup.url).then(() => r(true), () => r(false))),
+      5000
+    )
+
+    const { manager, openExternal } = makeManager(setup.configPath, setup.base)
+    await manager.init()
+    await manager.start('fixture-web')
+
+    expect(stateOf(manager)).toBe('running')
+    expect(openExternal).toHaveBeenCalledWith(setup.url)
+    expect(existsSync(join(setup.base, 'pids', 'fixture-web.pid'))).toBe(false)
+
+    await manager.stop('fixture-web')
+    await waitFor(() => stateOf(manager) === 'stopped', 5000)
+  })
+
+  it('start 时端口被占：快速 blocked、点名占用者、不 spawn', async () => {
+    const port = await freePort()
+    const setup = fixtureSetup(`node ${serveFixture} ${port}`, port)
+    const occupant = createServer((_req, res) => res.writeHead(503).end())
+    await new Promise<void>((r) => occupant.listen(port, '127.0.0.1', r))
+    junk.servers.push(occupant)
+
+    const { manager, openExternal } = makeManager(setup.configPath, setup.base)
+    await manager.init()
+    await manager.start('fixture-web')
+
+    expect(stateOf(manager)).toBe('blocked')
+    const app = manager.list().apps.find((a) => a.name === 'fixture-web')
+    expect(app?.line).toContain(String(port))
+    expect(app?.line).toContain(String(process.pid))
+    expect(existsSync(join(setup.base, 'pids', 'fixture-web.pid'))).toBe(false)
+    expect(openExternal).not.toHaveBeenCalled()
+  })
+
+  it('apiError：写入后出现在 list 并广播 refresh', async () => {
+    const port = await freePort()
+    const setup = fixtureSetup(`node ${serveFixture} ${port}`, port)
+    const { manager } = makeManager(setup.configPath, setup.base)
+    await manager.init()
+
+    const refreshed = vi.fn()
+    manager.on('refresh', refreshed)
+    manager.setApiError('门户/API 未启动：EADDRINUSE')
+
+    expect(manager.list().apiError).toBe('门户/API 未启动：EADDRINUSE')
+    expect(refreshed).toHaveBeenCalledTimes(1)
   })
 
   it('blocked：非 main 分支黄灯拒启', async () => {

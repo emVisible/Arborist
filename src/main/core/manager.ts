@@ -8,7 +8,9 @@ import { probeApp, type Probe } from './prober'
 import {
   currentBranch,
   killPids,
+  pidLabels,
   pidsOnPort,
+  portOf,
   startWeb,
   stopWeb,
   tailFile
@@ -51,6 +53,7 @@ export class AppManager extends EventEmitter {
   private entries = new Map<string, AppEntry>()
   private errors: { repoDir: string; message: string }[] = []
   private configError: string | undefined
+  private apiError: string | undefined
   private unregisteredCount = 0
   private iconCache = new Map<string, string>()
 
@@ -116,8 +119,14 @@ export class AppManager extends EventEmitter {
       apps: [...this.entries.values()].map((e) => this.viewOf(e)),
       errors: this.errors,
       configError: this.configError,
+      apiError: this.apiError,
       unregisteredCount: this.unregisteredCount
     }
+  }
+
+  setApiError(message: string): void {
+    this.apiError = message
+    this.emit('refresh')
   }
 
   get(name: string): Manifest | undefined {
@@ -158,6 +167,16 @@ export class AppManager extends EventEmitter {
       }
     }
 
+    // 端口体检：已在跑就认领，被占就立刻说清楚，端口空闲才 spawn。
+    const port = m.url ? portOf(m.url) : undefined
+    if (port !== undefined) {
+      const pids = await pidsOnPort(port)
+      if (pids.length > 0) {
+        await this.claimOrBlock(entry, port, pids)
+        return
+      }
+    }
+
     try {
       startWeb(m, this.opts.baseDir ?? ARBOR_DIR)
     } catch (e) {
@@ -173,6 +192,47 @@ export class AppManager extends EventEmitter {
     this.transition(entry, 'starting')
     entry.line = undefined
 
+    this.armStartWatchdog(entry)
+
+    this.emitChange(entry)
+    this.schedulePoll(entry, 400)
+  }
+
+  private async claimOrBlock(entry: AppEntry, port: number, pids: number[]): Promise<void> {
+    const probe = await probeApp(entry.m, this.opts.probeTimeoutMs ?? 1500)
+    entry.failStreak = 0
+    entry.startedByUs = true
+    entry.browserOpened = false
+
+    if (probe.reachable && probe.state === 'starting') {
+      this.transition(entry, 'starting')
+      entry.line = probe.line
+      this.armStartWatchdog(entry)
+      this.emitChange(entry)
+      this.schedulePoll(entry, 400)
+      return
+    }
+    if (probe.reachable && probe.state === 'error') {
+      entry.startedByUs = false
+      this.transition(entry, 'blocked')
+      entry.line = probe.line ?? '服务自报不可用，先停止再启动'
+      this.emitChange(entry)
+      return
+    }
+    if (probe.reachable) {
+      this.applyProbe(entry, probe)
+      this.schedulePoll(entry, 400)
+      return
+    }
+
+    const label = await pidLabels(pids)
+    entry.startedByUs = false
+    this.transition(entry, 'blocked')
+    entry.line = `端口 ${port} 被 ${label} 占用，未启动`
+    this.emitChange(entry)
+  }
+
+  private armStartWatchdog(entry: AppEntry): void {
     const timeoutMs = entry.m.startTimeoutMs ?? this.opts.startTimeoutMs ?? 60_000
     clearTimeout(entry.timeoutTimer)
     entry.timeoutTimer = setTimeout(() => {
@@ -182,9 +242,6 @@ export class AppManager extends EventEmitter {
         this.emitChange(entry)
       }
     }, timeoutMs)
-
-    this.emitChange(entry)
-    this.schedulePoll(entry, 400)
   }
 
   async stop(name: string): Promise<void> {
@@ -200,8 +257,7 @@ export class AppManager extends EventEmitter {
 
     const result = await stopWeb(entry.m, this.opts.baseDir ?? ARBOR_DIR)
     if (result === 'not-running' && entry.m.url) {
-      const port = Number(new URL(entry.m.url).port) || 80
-      const pids = await pidsOnPort(port)
+      const pids = await pidsOnPort(portOf(entry.m.url))
       if (pids.length > 0) await killPids(pids)
     }
 
