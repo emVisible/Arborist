@@ -210,11 +210,13 @@ Arborist 自己的 app.toml（`type = "menubar"`，自注册）；Ametrine 实�
    - 契约 `error` → blocked，line 用契约 line，不 spawn（进程活着但自报不可用，先停再启）。
    - 探测不通 → blocked，line 点名端口与占用 PID/命令，不 spawn。
 3. 清理出路复用既有 `stop()`：blocked ≠ stopped，右键停止会走「pidfile 不在 → 端口兜底击杀」。
+4. 同一成员的启动有 in-flight 守卫：branch / 端口检查期间的第二次点击直接忽略，不会双开。
 
 验收：
 - 外部已就绪服务 + 点击启动 → running、开浏览器、无 pidfile（未 spawn）
-- 哑监听占住端口 + 点击启动 → 2s 内 blocked，line 含端口与占用 PID，无 pidfile
+- 哑监听占住端口 + 点击启动 → 3s 内 blocked（探测最坏：契约 1.5s + ready 1.5s），line 含端口与占用 PID，无 pidfile
 - 端口空闲 → 既有 start→running 用例不回归
+- 并发点两次启动只 spawn 一次（无 EADDRINUSE）
 - 以上进 manager 集成测试
 
 ## M11 · 门户端口失败可见（0.5d）

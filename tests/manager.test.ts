@@ -1,6 +1,6 @@
 import { execFile, spawn } from 'node:child_process'
 import { promisify } from 'node:util'
-import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import { createServer, type Server } from 'node:http'
 import { tmpdir } from 'node:os'
 import { dirname, join } from 'node:path'
@@ -78,7 +78,10 @@ function stateOf(m: AppManager): string | undefined {
 afterEach(() => {
   for (const m of junk.managers.splice(0)) m.dispose()
   for (const c of junk.children.splice(0)) c.kill('SIGKILL')
-  for (const s of junk.servers.splice(0)) s.close()
+  for (const s of junk.servers.splice(0)) {
+    s.closeAllConnections()
+    s.close()
+  }
   for (const d of junk.dirs.splice(0)) rmSync(d, { recursive: true, force: true })
 })
 
@@ -145,6 +148,24 @@ describe('manager web 生命周期', () => {
     await waitFor(() => stateOf(manager) === 'stopped', 5000)
   })
 
+  it('并发 start 只 spawn 一次（无 EADDRINUSE）', async () => {
+    const port = await freePort()
+    const setup = fixtureSetup(`node ${serveFixture} ${port}`, port)
+    const { manager } = makeManager(setup.configPath, setup.base)
+    await manager.init()
+
+    await Promise.all([manager.start('fixture-web'), manager.start('fixture-web')])
+    await waitFor(() => stateOf(manager) === 'running', 8000)
+    await new Promise((r) => setTimeout(r, 800))
+
+    const log = readFileSync(join(setup.base, 'logs', 'fixture-web.log'), 'utf8')
+    expect(log).not.toContain('EADDRINUSE')
+    expect(log.match(/listening/g)?.length).toBe(1)
+
+    await manager.stop('fixture-web')
+    await waitFor(() => stateOf(manager) === 'stopped', 5000)
+  })
+
   it('start 时端口被占：快速 blocked、点名占用者、不 spawn', async () => {
     const port = await freePort()
     const setup = fixtureSetup(`node ${serveFixture} ${port}`, port)
@@ -177,6 +198,28 @@ describe('manager web 生命周期', () => {
     expect(manager.list().apiError).toBe('门户/API 未启动：EADDRINUSE')
     expect(refreshed).toHaveBeenCalledTimes(1)
   })
+
+  it('start 时端口被「只连不答」进程占住：最坏 3s 内 blocked', async () => {
+    const port = await freePort()
+    const setup = fixtureSetup(`node ${serveFixture} ${port}`, port)
+    const occupant = createServer(() => {})
+    await new Promise<void>((r) => occupant.listen(port, '127.0.0.1', r))
+    junk.servers.push(occupant)
+
+    const { manager, openExternal } = makeManager(setup.configPath, setup.base)
+    await manager.init()
+    const t0 = Date.now()
+    await manager.start('fixture-web')
+    const elapsed = Date.now() - t0
+
+    expect(stateOf(manager)).toBe('blocked')
+    expect(elapsed).toBeLessThan(4000)
+    const app = manager.list().apps.find((a) => a.name === 'fixture-web')
+    expect(app?.line).toContain(String(port))
+    expect(app?.line).toContain(String(process.pid))
+    expect(existsSync(join(setup.base, 'pids', 'fixture-web.pid'))).toBe(false)
+    expect(openExternal).not.toHaveBeenCalled()
+  }, 10_000)
 
   it('blocked：非 main 分支黄灯拒启', async () => {
     const port = await freePort()

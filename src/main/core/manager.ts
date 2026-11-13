@@ -42,6 +42,7 @@ export interface AppEntry {
   startedByUs: boolean
   browserOpened: boolean
   failStreak: number
+  busy?: boolean
   timer?: NodeJS.Timeout
   timeoutTimer?: NodeJS.Timeout
   emittedState?: LightState
@@ -156,6 +157,19 @@ export class AppManager extends EventEmitter {
       return
     }
     if (entry.state === 'starting' || entry.state === 'stopping') return
+    if (entry.busy) return
+
+    // 从 branch / 端口检查到 spawn 之间有 await：不挡住并发第二次点击，就会双开。
+    entry.busy = true
+    try {
+      await this.beginStart(entry)
+    } finally {
+      entry.busy = false
+    }
+  }
+
+  private async beginStart(entry: AppEntry): Promise<void> {
+    const m = entry.m
 
     if (m.branch) {
       const br = await currentBranch(m.repoDir)
