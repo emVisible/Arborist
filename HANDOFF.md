@@ -6,7 +6,7 @@
 
 Arborist 是主人（emVisible，本地用户 `young`）的个人 app 中控台：常驻 macOS menu bar 的 Electron 应用，管理他自己开发的一批小软件（web 服务 / 桌面应用 / menu bar 守护三类）。它是《The Grove 个人数字生态蓝图》中 Grove 模块的落地形态——中控台先行，浏览器门户已随 v0.2.0 交付。定位一句话：**管点火，不管聚合；产品模式，不是开发模式**。
 
-当前状态：**v0.3.0 已发布**（dmg 在 `release/Arborist-0.3.0-arm64.dmg`）：v0.2.1 之后完成 M10–M12「端口诚实」——web 启动前端口体检（已在跑认领 / 被占立即 blocked 并点名占用者）、门户端口失败在面板可见。43 个测试全绿。
+当前状态：**v0.3.1 已发布**（dmg 在 `release/Arborist-0.3.1-arm64.dmg`）：v0.3.0「端口诚实」——web 启动前端口体检（已在跑认领 / 被占 blocked 并点名占用者）、门户端口失败在面板可见；0.3.1 修复了并发启动双开。45 个测试全绿。
 
 真实注册表有 **五个成员**：Arborist 自注册 + **Ametrine**（web；栈在跑时契约回 `ok`，绿）+ **Hertz**（app，v0.37.0，repo 内构建经 LaunchServices 注册）+ **Thistelles** / **MiniStat**（menubar，住清单目录）。**v1 验收的「三类 app 各至少一个真实成员」到此满足**；未注册目录剩 5 个（Axiforge、Axis、VisualNovel、_refs、rewind）。Ametrine 侧改动已提交（它自己 repo 的 `9d52dee`）；Hertz 的 `app.toml` 未提交（它 repo 的 AGENTS.md 要求提交前跑 `--quick`，留给主人）。
 
@@ -29,7 +29,7 @@ src/shared/types.ts 前后端共享类型
 resources/portal/   门户页（无构建单文件 HTML，时间氛围主题）
 scripts/            gen-icons.mjs（零依赖 PNG 编码器）/ preview 两件套
 fixtures/           spawn-tree.sh / serve.mjs（集成测试夹具）
-tests/              7 文件 43 用例
+tests/              7 文件 45 用例
 ```
 
 数据流：registry 发现 → manager 持状态机 → poll 驱动灯色 → 事件 `update`/`refresh` 广播到托盘面板与门户。状态不持久化（认领 = 重启后重新轮询）。

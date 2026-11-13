@@ -6,7 +6,7 @@
 
 我做了很多小工具，每个都长出了自己的启动入口——`dev.sh`、`start.sh`、`webui.sh`、Makefile，或者只是肌肉记忆里的 shell 历史。Arborist 用一个约定替代这一切：想被管理的 repo 在根目录放一个 `app.toml`，剩下的交给 Arborist。
 
-当前状态：**v0.3.0**——中控台、本地 API 与门户均已交付；里程碑与验收标准见 [PLAN.md](PLAN.md)。
+当前状态：**v0.3.1**——中控台、本地 API 与门户均已交付；里程碑与验收标准见 [PLAN.md](PLAN.md)。
 
 ## 文档
 
@@ -29,7 +29,7 @@
 
 ```sh
 pnpm install
-pnpm dist        # → release/Arborist-0.3.0-arm64.dmg
+pnpm dist        # → release/Arborist-0.3.1-arm64.dmg
 ```
 
 源码运行：`pnpm dev`。不启动 Electron、在浏览器里直接调 dropdown UI：`pnpm preview:ui`。
