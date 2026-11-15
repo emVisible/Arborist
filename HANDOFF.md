@@ -1,14 +1,14 @@
 # Arborist 交接文档
 
-写给接手的 agent。你没有任何前情对话上下文，本文档 + 仓库里的既有文档就是全部背景。**按顺序读**：`README.zh-CN.md` → `PROJECT.md`（设计决策记录，必读）→ `PLAN.md`（v1 与 v0.2 的里程碑，含验收标准）→ 本文档。契约规范在 `docs/app-toml.md` 和 `docs/arbor-status.md`。
+写给接手的 agent。你没有任何前情对话上下文，本文档 + 仓库里的既有文档就是全部背景。**按顺序读**：`README.zh-CN.md` → `PROJECT.md`（设计决策记录，必读）→ `PLAN.md`（v1 与 v0.2–v0.4 的里程碑，含验收标准）→ 本文档。契约规范在 `docs/app-toml.md` 和 `docs/arbor-status.md`。
 
 ## 项目是什么
 
 Arborist 是主人（emVisible，本地用户 `young`）的个人 app 中控台：常驻 macOS menu bar 的 Electron 应用，管理他自己开发的一批小软件（web 服务 / 桌面应用 / menu bar 守护三类）。它是《The Grove 个人数字生态蓝图》中 Grove 模块的落地形态——中控台先行，浏览器门户已随 v0.2.0 交付。定位一句话：**管点火，不管聚合；产品模式，不是开发模式**。
 
-当前状态：**v0.3.1 已发布**（dmg 在 `release/Arborist-0.3.1-arm64.dmg`）：v0.3.0「端口诚实」——web 启动前端口体检（已在跑认领 / 被占 blocked 并点名占用者）、门户端口失败在面板可见；0.3.1 修复了并发启动双开。45 个测试全绿。
+当前状态：**v0.3.1 已发布**（dmg 在 `release/Arborist-0.3.1-arm64.dmg`）：v0.3.0「端口诚实」——web 启动前端口体检（已在跑认领 / 被占 blocked 并点名占用者）、门户端口失败在面板可见；0.3.1 修复了并发启动双开。45 个测试全绿。**v0.4.0「开机即绿」计划已立档（PLAN.md，M13–M15），尚未开工。**
 
-真实注册表有 **五个成员**：Arborist 自注册 + **Ametrine**（web；栈在跑时契约回 `ok`，绿）+ **Hertz**（app，v0.37.0，repo 内构建经 LaunchServices 注册）+ **Thistelles** / **MiniStat**（menubar，住清单目录）。**v1 验收的「三类 app 各至少一个真实成员」到此满足**；未注册目录剩 5 个（Axiforge、Axis、VisualNovel、_refs、rewind）。Ametrine 侧改动已提交（它自己 repo 的 `9d52dee`）；Hertz 的 `app.toml` 未提交（它 repo 的 AGENTS.md 要求提交前跑 `--quick`，留给主人）。
+真实注册表有 **六个成员**：Arborist 自注册 + **Ametrine**（web；栈在跑时契约回 `ok`，绿）+ **Hertz**（app，v0.37.0，repo 内构建经 LaunchServices 注册）+ **Axiforge**（app，已登记，Tauri 成品未构建）+ **Thistelles** / **MiniStat**（menubar，住清单目录）。**v1 验收的「三类 app 各至少一个真实成员」到此满足**；未注册目录剩 7 个（Axis、Ginko、Thistelles、VisualNovel、_refs、rewind、truth）。Ametrine 侧改动已提交（它自己 repo 的 `9d52dee`）；Hertz 的 `app.toml` 未提交（它 repo 的 AGENTS.md 要求提交前跑 `--quick`，留给主人）。
 
 ## 架构速览
 
@@ -105,20 +105,23 @@ node scripts/gen-icons.mjs   # 重新生成托盘/应用图标（改图标后必
 
 | 成员 | 这台机器上的现实 | 还缺 |
 |---|---|---|
-| Hertz | 已接入（2026-11-01）：`pnpm --filter hertz-electron build:dir` 出 v0.37.0 → `lsregister -f` 注册 repo 内包 → manifest 用 `ai.hertz.app` | 实测 `open -b` rc=0、在跑/退出两向都验过；但成品是 repo 内 1.2GB 构建（没装 /Applications），删 `electron/release/` 成员就失效 |
+| Hertz | 已接入（2026-11-01）：`pnpm --filter hertz-electron build:dir` 出 v0.37.0 → `lsregister -f` 注册 repo 内包 → manifest 用 `ai.hertz.app` | 实测 `open -b` rc=0、在跑/退出两向都验过；面板按钮路径待 v0.4 前置验收；成品是 repo 内 1.2GB 构建（没装 /Applications），删 `electron/release/` 成员就失效 |
 | Axiforge | Tauri 桌面从未构建（全仓 0 个 `.app`），只有 `pnpm dev:desktop` | 构建产物 |
-| Thistelles | 源码仓不在本机（uv receipt 指向已删除的 `~/Code/Thistelles`），只有 `/Applications` 里的成品在跑 → **已接入清单目录** | 已接入；`open` 必须写 `com.thistelles.app`，因为打包后的进程名是 `PythonRuntime`，`pgrep -x Thistelles` 匹配不到 |
+| Thistelles | 源码仓不在本机（uv receipt 指向已删除的 `~/Code/Thistelles`），只有 `/Applications` 里的成品在跑 → **已接入清单目录** | 已接入；`open` 必须写 `com.thistelles.app`，因为打包后的进程名是 `PythonRuntime`，`pgrep -x Thistelles` 匹配不到。本机清单已加 `login = true`（2026-11-13），登录项开关待实测 |
 | MiniStat | 同上 | 已接入（`com.ministat.app`）；没声明 `login`，登录项状态仍归主人自己管 |
-| Ametrine 想真绿 | **已绿**：原生 PG（`brew services start postgresql@18`）+ compose redis 容器 + 10/18 就存在的 embedded milvus 容器；契约实测 `{"state":"ok","line":"v0.3.0 · 依赖全部正常"}` | 常驻前提：Docker Desktop 得开机自启（未验证）；Milvus 那只是 `docker run` 建的裸容器，不归 compose 管 |
+| Ametrine 想真绿 | **已绿**：原生 PG（`brew services start postgresql@18`）+ compose redis 容器 + 10/18 就存在的 embedded milvus 容器；契约实测 `{"state":"ok","line":"v0.3.0 · 依赖全部正常"}` | 常驻已开：Docker `AutoStart=True`（settings-store），Redis/Milvus 均 `restart=unless-stopped`，2026-11-13 实测随 Docker 启动即 healthy；Milvus 是 `ETCD_USE_EMBED` + 本地存储的裸容器，不归 compose 管。整机重启验收留给 v0.4 M15 |
 
-## 下一步（按建议优先级）
+## 下一步（v0.4 已立档）
 
-**待主人定档（上面表格里「还缺」那列都是决定，不是工时）**：Axiforge 是否构建成品；数据层常驻（Docker Desktop 开机自启、Milvus 裸容器的归属）；Hertz 是否装进 `/Applications`（现在是 repo 内构建 + LaunchServices 注册）。
+**v0.4.0「开机即绿」（M13–M15，见 PLAN.md）**：登录后 Arborist 静默起身，声明 `autostart = true` 的 web 成员自动拉起；不抢焦点、不自动开浏览器、不假装健康。
 
-**v0.4 候选（动手前先和主人对齐）**：
-1. `/api/arbor/search` 全局搜索 + 门户搜索框——前置条件仍是 ≥3 个成员实现 status 契约（当前只有 Ametrine 一个 web 成员，实际达不到）。
-2. 自动更新（个人用，可先做"检查 GitHub release 提示"轻量版；远端目前还没有 release 通道）。
-3. Playwright E2E。
-4. v1 遗留手工回归项：Hertz 一键打开、Thistelles 登录项开关真实验证（需要主人在场授权 System Events）。
+**已定档**：Docker 自启=开；Hertz=保持 repo 内构建；Axiforge=暂不构建；Thistelles 本机清单加 `login = true`。
+
+**前置（未完成）**：
+1. v1 手工回归：Hertz 面板一键开/退、Thistelles 登录项开关；Ametrine 本次环境改动后的 start→绿。
+2. self 清单 `open` 改为 bundle id（本机已改，待提交）——打包态自检灯才是绿的。
+3. 登录自启验收前把 0.4.0 dmg 装进 `/Applications`；当前只有 release 内构建，登录项会指向它。
+
+**不选其他候选的理由**：搜索仍卡 ≥3 个成员实现 status 契约；自动更新没有 tag/release，且 GitHub API/tags 在本机实测超时；门户快捷操作仍在 PROJECT.md 决策门槛内；E2E 留 backlog，v0.4 用真实重启验收替代。
 
 **修 bug 时的锚点**：状态机转移全在 `manager.ts` 的 `applyProbe`/`poll`；停止语义在 `supervisor.ts`；灯色映射 CSS 在 `app.css` 与 `resources/portal/index.html` 两处（改动要同步）。

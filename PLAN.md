@@ -230,3 +230,81 @@ Arborist 自己的 app.toml（`type = "menubar"`，自注册）；Ametrine 实�
 版本 0.3.0、CHANGELOG、README 双语、HANDOFF、dmg、打包后端到端冒烟、验收三件套。
 
 **v0.3.0 完成定义**：M10–M12 全过；Ametrine 在「已在跑 / 端口被占 / 正常启动」三种现场行为符合 M10 验收。
+
+---
+
+# v0.4.0 · 开机即绿（M13–M15）
+
+主题：把「每天第一次用」的最后一次点击也去掉——登录后 Arborist 静默起身，声明了自启的 web 成员自动拉起；不抢焦点、不自动开浏览器、不假装健康。搜索仍被「≥3 个成员实现 status 契约」卡住，自动更新仍被发布通道与本机网络卡住，E2E 仍是工程项；v0.4 只补日常缺口。
+
+开工前先收 v1 尾巴：Hertz 面板一键开/退、Thistelles 登录项开关（M14 一起验）、self 清单 bundle id 修复提交。
+
+三原则：
+
+1. **只点火，不编排环境**：不装依赖、不迁移、不起 Docker；数据层缺席就 `degraded`（决策 1 不变）。
+2. **自启是成员属性，默认关闭**：用户 `stop` 后不自动重启，只有下一次 Arborist 启动才再尝试。
+3. **静默**：不打开面板、不自动开浏览器；绿灯后由人决定何时打开。
+
+## M13 · 自启成员（约 1d）
+
+现状：`start()` 只有手动入口；每次登录后 web 成员仍要点一次。
+
+行为：
+
+- `app.toml` 增加 `autostart = true`（**仅 web 类**；默认 false；其他类型写了直接校验报错）。解析进 `Manifest.autostart`；`docs/app-toml.md` 同步。
+- `AppManager.start(name, opts?: { silent?: boolean })`：silent 时，running/degraded/starting 直接返回；spawn 或认领时把本次启动的 `browserOpened` 预置为 true，绿了也不开浏览器（复用现有语义，不新增状态字段）。
+- `AppManager.startAutostarts()`：过滤 `type === 'web' && autostart`，按 name 顺序，`autostartDelayMs`（缺省 2s）后逐个 `start(name, { silent: true })`，间隔 `autostartStaggerMs`（缺省 1s）；日志一行 `[arborist] autostart: <names>`。
+- `index.ts` 在 tray 启动后调用 `void manager.startAutostarts()`，不阻塞 API/门户启动；API 挂了也照常自启。
+- 手动点击路径不变：running 时开页、start 后首次可用来开浏览器。
+
+验收：
+
+- fixture web + `autostart` → 启动后自动 spawn，`stopped→starting→running`，`openExternal` 未被调用
+- 已在跑的成员 → 只认领为 running/degraded，不开浏览器、不 spawn
+- 手动 `stop()` 后 10s 内不自动重启
+- 分支不对 / 端口被占 → 既有 blocked 文案，不 spawn
+- 两个自启成员按 name 顺序、按 stagger 启动；stagger=0 时可测
+- `autostart` 解析边界：web=true、缺省=false、app/menubar 写了报错
+- 并发：自启与手动同时点，仍只 spawn 一次
+
+## M14 · 登录形态（约 0.5d）
+
+现状：打包版启动已是纯菜单栏（`!app.isPackaged` 才 `showPanel`）；面板 footer 已有原生 `自启` 开关（`app.setLoginItemSettings`）；self 卡片检测已改为 bundle id（本机已改，待提交）。缺的是真实登录项验收。
+
+行为：
+
+- 验收前把 0.4.0 dmg 装进 `/Applications`（登录项指向运行副本；release 目录是构建产物，不适合长期当登录项目标）。
+- `自启` 开关打开/关闭 → 系统设置可见；登录后静默启动：只有菜单栏图标，无 Dock 图标、无面板弹窗。
+- self 清单去掉 `login = true`，登录项统一走 footer 原生开关，避免与卡片右键的 System Events 路径重复添加。
+- Thistelles 本机清单已加 `login = true`；把它的「开机自启」开关做真实勾选/取消验证（v1 遗留）。
+- 若拒绝/未授权，登录项管理仍走现有降级文案，不阻塞。
+
+验收：
+
+- 注销/重启后 Arborist 自动出现菜单栏图标；面板不弹、浏览器不弹
+- `自启` 勾选状态与系统设置一致；关闭后重启不再自启
+- self 卡片绿灯；Thistelles 开关勾选/取消都真实生效（系统设置可见；条件允许时注销重登一次）
+
+## M15 · 开机验收与发版（约 0.5–1d）
+
+三个现场：
+
+- **A 正常重启**：Docker/PG/Redis/Milvus 自启 → Arborist 静默 → Ametrine 自启 → 3 分钟内契约 `ok`、面板/门户绿；全程无终端、无浏览器弹窗。
+- **B 数据层缺席**（退出 Docker / 停依赖）：Ametrine 起但契约 `degraded`，面板橙灯并点名缺谁；恢复依赖后轮询自动回绿，不重启 Ametrine。
+- **C 端口被占 / 分支不对**：自启走既有 `claimOrBlock`，blocked 文案，不 spawn、不双开。
+
+回归：手动 start 仍开浏览器；Hertz 面板一键开/退；门户 8790 正常；kill -9 Arborist 后重启认领。
+
+收尾：版本 0.4.0、CHANGELOG、README 双语、HANDOFF、dmg、打包冒烟、验收三件套。
+
+**v0.4.0 完成定义**：M13–M15 全过；场景 A 真实通过（一次整机重启，无终端、无面板弹窗、Ametrine 绿）；场景 B/C 行为诚实。
+
+## 明确不做（v0.4）
+
+- 全局搜索 / 门户搜索：门槛仍是 ≥3 个成员实现 status 契约（只有 Ametrine）。
+- 自动更新：没有 tag/release 通道；GitHub API/tags 在本机实测超时。
+- 门户快捷操作 / `/api/arbor/actions`：仍在 PROJECT.md 的决策门槛内。
+- Playwright E2E：backlog；v0.4 用真实重启验收覆盖启动路径。
+- 自动重启 / 守护：用户 stop 后不拉起。
+- 环境构建 / 依赖 / 迁移 / 数据库：决策 1 不变。
+- 成员管理 UI / 配置写回：本轮仍改 manifest。
