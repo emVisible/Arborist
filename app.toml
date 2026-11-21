@@ -2,6 +2,5 @@ name  = "arborist"
 title = "Arborist"
 type  = "menubar"
 open  = "com.emvisible.arborist"
-login = true
 icon  = "resources/icon.png"
 notes = "自己管自己"
