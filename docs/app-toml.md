@@ -25,6 +25,7 @@
 | `branch` | string | web | — | 限定启动分支（产品模式纪律），缺省不检查 |
 | `open` | string | app / menubar | ✅ | 传给 `open -a` 的应用名或 bundle id |
 | `login` | bool | menubar | — | 由 Arborist 统一管理 login item |
+| `autostart` | bool | web | — | Arborist 启动后静默拉起；默认 false。仅 web 类可写 |
 | `icon` | string | 全部 | — | 相对 repo 根的路径，建议 128px PNG |
 | `notes` | string | 全部 | — | 自由文本备注 |
 
@@ -43,6 +44,7 @@
 ## 进程与停止
 
 - `web` 启动时以**独立进程组**（pgid）detach 运行，Arborist 自身退出不影响服务。
+- `start` 继承用户登录 shell 的 `PATH`（启动时取一次，失败退回进程自身 PATH）。登录项启动的 GUI app 默认只有系统 PATH，不这样做的话来自 shell profile 的 `node` / `pnpm` / `uv` 在开机自启时会找不到。
 - pgid 记录在 `~/.arborist/pids/<name>.pid`。
 - 停止顺序：向整个进程组发 TERM（`npm run dev` → vite → node 的子树一并收掉），5 秒仍存活则 KILL。
 - 状态灯只反映探测结果，不记录"是不是 Arborist 启动的"——因此 Arborist 重启后重新轮询即完成认领，无状态需迁移。
@@ -51,6 +53,14 @@
 ## 分支纪律（产品模式）
 
 manifest 声明 `branch = "main"` 时，启动前检查 repo 当前 checkout：不在 main → 黄灯，拒绝启动，提示切回。开发在分支上进行，合并即发布。`app` / `menubar` 类通常指向已安装的 .app，不受此约束。
+
+## 自启与静默（v0.4）
+
+`autostart = true` 的 web 成员会在 Arborist 启动后自动拉起：默认延迟 2s、按 name 顺序、每个间隔 1s。它只负责「点火」，不保证数据层；依赖缺席时照常 `degraded`。
+
+- **不自动开浏览器**：自动启动成功后灯变绿，但不会抢焦点；要看时点卡片或门户。
+- **不守护**：用户点「停止」后不会被拉起；只有下一次 Arborist 启动才会再尝试一次。
+- **仅 web 类**：`app` / `menubar` 写了会校验失败（它们该用 `login` 或系统登录项）。
 
 ## 示例
 
@@ -65,6 +75,7 @@ url    = "http://127.0.0.1:8000"
 ready  = "http:/api/arbor/status"
 start_timeout_ms = 180000
 branch = "main"
+autostart = true
 icon   = "apps/frontend/public/favicon.png"
 notes  = "本地优先 RAG 知识库。数据层缺席时契约回 degraded 并点名是谁"
 ```

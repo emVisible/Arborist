@@ -1,4 +1,4 @@
-import { execFile, spawn } from 'node:child_process'
+import { execFile, execFileSync, spawn } from 'node:child_process'
 import {
   closeSync,
   existsSync,
@@ -22,6 +22,30 @@ export type StopResult = 'stopped' | 'forced' | 'not-running'
 
 const sleep = (ms: number): Promise<void> => new Promise((r) => setTimeout(r, ms))
 
+const PATH_MARK = '__ARBOR_PATH__'
+let cachedLoginPath: string | null = null
+
+// 登录项启动的 GUI app 只有 /usr/bin:/bin:/usr/sbin:/sbin，而 start 命令
+// 通常是在用户终端里写的（node / pnpm / uv 都在 shell profile 里）。
+// 这里取一次登录 shell 的 PATH，让“终端能起”和“开机自启能起”是同一套环境。
+function loginPath(): string | undefined {
+  if (cachedLoginPath !== null) return cachedLoginPath || undefined
+  cachedLoginPath = ''
+  const shell = process.env.SHELL || '/bin/zsh'
+  try {
+    const out = execFileSync(shell, ['-lic', `printf '${PATH_MARK}%s' "$PATH"`], {
+      timeout: 3000,
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore']
+    })
+    const i = out.lastIndexOf(PATH_MARK)
+    if (i >= 0) cachedLoginPath = out.slice(i + PATH_MARK.length).trim()
+  } catch {
+    /* 取不到就用进程自身 PATH 兜底 */
+  }
+  return cachedLoginPath || undefined
+}
+
 // web 类服务以独立进程组（pgid）detach 运行：Arborist 退出不影响服务，
 // 停止时整组击杀，npm run dev → vite → node 的子树一并收掉。
 export function startWeb(m: Manifest, baseDir: string): StartResult {
@@ -33,11 +57,13 @@ export function startWeb(m: Manifest, baseDir: string): StartResult {
   if (existsSync(logFile) && statSync(logFile).size > 5 * 1024 * 1024) truncateSync(logFile)
 
   const fd = openSync(logFile, 'a')
+  const path = loginPath()
   try {
     const child = spawn(m.start!, {
       shell: '/bin/sh',
       detached: true,
       cwd: m.repoDir,
+      env: path ? { ...process.env, PATH: path } : process.env,
       stdio: ['ignore', fd, fd]
     })
     child.unref()

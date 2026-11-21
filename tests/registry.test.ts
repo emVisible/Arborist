@@ -167,4 +167,24 @@ describe('parseManifest', () => {
     const r = parseManifest(join(dir, 'app.toml'), dir)
     expect('manifest' in r && r.manifest.login).toBe(true)
   })
+
+  it('autostart 仅 web 可写，缺省 false，类型必须布尔', () => {
+    const web = repo(root(), 'web-on', WEB + 'autostart = true\n')
+    const on = parseManifest(join(web, 'app.toml'), web)
+    expect('manifest' in on && on.manifest.autostart).toBe(true)
+
+    const webOff = repo(root(), 'web-off', WEB)
+    const off = parseManifest(join(webOff, 'app.toml'), webOff)
+    expect('manifest' in off && off.manifest.autostart).toBe(false)
+
+    for (const [name, toml] of [
+      ['app-on', APP + 'autostart = true\n'],
+      ['menubar-on', 'name = "m"\ntype = "menubar"\nopen = "M"\nautostart = true\n'],
+      ['web-bad', WEB + 'autostart = "true"\n']
+    ] as const) {
+      const dir = repo(root(), name, toml)
+      const r = parseManifest(join(dir, 'app.toml'), dir)
+      expect('error' in r && r.error).toContain('autostart')
+    }
+  })
 })

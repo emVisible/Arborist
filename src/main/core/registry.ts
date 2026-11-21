@@ -16,6 +16,7 @@ export interface Manifest {
   startTimeoutMs?: number
   open?: string
   login?: boolean
+  autostart?: boolean
   iconPath?: string
   notes?: string
 }
@@ -127,6 +128,13 @@ export function parseManifest(
     startTimeoutMs = v
   }
 
+  let autostart = false
+  if (t.autostart !== undefined) {
+    if (typeof t.autostart !== 'boolean') return { error: 'autostart 必须是布尔值' }
+    if (appType !== 'web') return { error: 'autostart 仅 web 类支持' }
+    autostart = t.autostart
+  }
+
   let iconPath: string | undefined
   if (typeof t.icon === 'string' && t.icon) {
     const p = join(repoDir, t.icon)
@@ -148,6 +156,7 @@ export function parseManifest(
       startTimeoutMs,
       open,
       login: t.login === true,
+      autostart,
       iconPath,
       notes: str(t.notes)
     }

@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events'
 import { execFile } from 'node:child_process'
 import { readFileSync } from 'node:fs'
+import { setTimeout as delay } from 'node:timers/promises'
 import { ARBOR_DIR, loadConfig, ConfigError, CONFIG_PATH, DEFAULT_HOTKEY, type ArborConfig } from './config'
 import { join } from 'node:path'
 import { discoverApps, type Manifest } from './registry'
@@ -32,6 +33,8 @@ export interface ManagerOptions {
   pollIntervalMs?: number
   startTimeoutMs?: number
   probeTimeoutMs?: number
+  autostartDelayMs?: number
+  autostartStaggerMs?: number
   openExternal?: (url: string) => void
 }
 
@@ -57,6 +60,7 @@ export class AppManager extends EventEmitter {
   private apiError: string | undefined
   private unregisteredCount = 0
   private iconCache = new Map<string, string>()
+  private disposed = false
 
   constructor(readonly opts: ManagerOptions = {}) {
     super()
@@ -142,18 +146,19 @@ export class AppManager extends EventEmitter {
     return this.config.hotkey
   }
 
-  async start(name: string): Promise<void> {
+  async start(name: string, opts: { silent?: boolean } = {}): Promise<void> {
     const entry = this.entries.get(name)
     if (!entry) return
     const m = entry.m
+    const silent = opts.silent === true
 
     if (m.type !== 'web') {
-      this.open(name)
+      if (!silent) this.open(name)
       return
     }
 
     if (entry.state === 'running' || entry.state === 'degraded') {
-      this.open(name)
+      if (!silent) this.open(name)
       return
     }
     if (entry.state === 'starting' || entry.state === 'stopping') return
@@ -162,13 +167,34 @@ export class AppManager extends EventEmitter {
     // 从 branch / 端口检查到 spawn 之间有 await：不挡住并发第二次点击，就会双开。
     entry.busy = true
     try {
-      await this.beginStart(entry)
+      await this.beginStart(entry, silent)
     } finally {
       entry.busy = false
     }
   }
 
-  private async beginStart(entry: AppEntry): Promise<void> {
+  async startAutostarts(): Promise<void> {
+    const names = [...this.entries.values()]
+      .filter((e) => e.m.type === 'web' && e.m.autostart)
+      .map((e) => e.m.name)
+      .sort((a, b) => a.localeCompare(b))
+    if (names.length === 0) return
+
+    const delayMs = this.opts.autostartDelayMs ?? 2000
+    const staggerMs = this.opts.autostartStaggerMs ?? 1000
+    if (delayMs > 0) await delay(delayMs)
+    if (this.disposed) return
+
+    console.log(`[arborist] autostart: ${names.join(', ')}`)
+    for (let i = 0; i < names.length; i++) {
+      if (this.disposed) return
+      if (i > 0 && staggerMs > 0) await delay(staggerMs)
+      if (this.disposed) return
+      await this.start(names[i], { silent: true })
+    }
+  }
+
+  private async beginStart(entry: AppEntry, silent: boolean): Promise<void> {
     const m = entry.m
 
     if (m.branch) {
@@ -186,7 +212,7 @@ export class AppManager extends EventEmitter {
     if (port !== undefined) {
       const pids = await pidsOnPort(port)
       if (pids.length > 0) {
-        await this.claimOrBlock(entry, port, pids)
+        await this.claimOrBlock(entry, port, pids, silent)
         return
       }
     }
@@ -201,7 +227,8 @@ export class AppManager extends EventEmitter {
     }
 
     entry.startedByUs = true
-    entry.browserOpened = false
+    // silent 启动把「浏览器已处理」预置为 true：就绪后不再自动开页。
+    entry.browserOpened = silent
     entry.failStreak = 0
     this.transition(entry, 'starting')
     entry.line = undefined
@@ -212,11 +239,17 @@ export class AppManager extends EventEmitter {
     this.schedulePoll(entry, 400)
   }
 
-  private async claimOrBlock(entry: AppEntry, port: number, pids: number[]): Promise<void> {
+  private async claimOrBlock(
+    entry: AppEntry,
+    port: number,
+    pids: number[],
+    silent: boolean
+  ): Promise<void> {
     const probe = await probeApp(entry.m, this.opts.probeTimeoutMs ?? 1500)
     entry.failStreak = 0
     entry.startedByUs = true
-    entry.browserOpened = false
+    // 认领同样遵守 silent：自动启动不抢浏览器焦点。
+    entry.browserOpened = silent
 
     if (probe.reachable && probe.state === 'starting') {
       this.transition(entry, 'starting')
@@ -263,6 +296,10 @@ export class AppManager extends EventEmitter {
     if (!entry || entry.m.type !== 'web') return
     if (entry.state === 'stopped') return
 
+    // blocked / error 说明端口上的进程未必是我们的；停止只清自己的 pidfile，
+    // 不能按端口兜底误杀（例如 Ametrine 的 8000 被别的服务占着）。
+    const mayKillPortOwner = entry.state === 'running' || entry.state === 'degraded'
+
     clearTimeout(entry.timer)
     clearTimeout(entry.timeoutTimer)
     this.transition(entry, 'stopping')
@@ -270,7 +307,7 @@ export class AppManager extends EventEmitter {
     this.emitChange(entry)
 
     const result = await stopWeb(entry.m, this.opts.baseDir ?? ARBOR_DIR)
-    if (result === 'not-running' && entry.m.url) {
+    if (result === 'not-running' && entry.m.url && mayKillPortOwner) {
       const pids = await pidsOnPort(portOf(entry.m.url))
       if (pids.length > 0) await killPids(pids)
     }
@@ -343,6 +380,7 @@ export class AppManager extends EventEmitter {
   }
 
   dispose(): void {
+    this.disposed = true
     for (const entry of this.entries.values()) {
       clearTimeout(entry.timer)
       clearTimeout(entry.timeoutTimer)

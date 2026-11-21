@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { AppManager } from '../src/main/core/manager'
-import { freePort, waitFor } from './helpers'
+import { freePort, sleep, waitFor } from './helpers'
 
 const sh = promisify(execFile)
 const repoRoot = join(dirname(fileURLToPath(import.meta.url)), '..')
@@ -71,8 +71,12 @@ function makeManager(
   return { manager, openExternal }
 }
 
+function stateOfName(m: AppManager, name: string): string | undefined {
+  return m.list().apps.find((a) => a.name === name)?.state
+}
+
 function stateOf(m: AppManager): string | undefined {
-  return m.list().apps.find((a) => a.name === 'fixture-web')?.state
+  return stateOfName(m, 'fixture-web')
 }
 
 afterEach(() => {
@@ -165,6 +169,27 @@ describe('manager web 生命周期', () => {
     await manager.stop('fixture-web')
     await waitFor(() => stateOf(manager) === 'stopped', 5000)
   })
+
+  it('autostart 与手动同时触发只 spawn 一次', async () => {
+    const port = await freePort()
+    const setup = fixtureSetup(`node ${serveFixture} ${port}`, port, 'autostart = true\n')
+    const { manager } = makeManager(setup.configPath, setup.base, {
+      autostartDelayMs: 0,
+      autostartStaggerMs: 0
+    })
+    await manager.init()
+
+    await Promise.all([manager.startAutostarts(), manager.start('fixture-web')])
+    await waitFor(() => stateOf(manager) === 'running', 8000)
+    await sleep(800)
+
+    const log = readFileSync(join(setup.base, 'logs', 'fixture-web.log'), 'utf8')
+    expect(log).not.toContain('EADDRINUSE')
+    expect(log.match(/listening/g)?.length).toBe(1)
+
+    await manager.stop('fixture-web')
+    await waitFor(() => stateOf(manager) === 'stopped', 5000)
+  }, 15_000)
 
   it('start 时端口被占：快速 blocked、点名占用者、不 spawn', async () => {
     const port = await freePort()
@@ -282,4 +307,186 @@ describe('manager web 生命周期', () => {
     await manager.stop('fixture-web')
     await waitFor(() => stateOf(manager) === 'stopped', 5000)
   })
+
+  it('autostart：未声明 autostart 的成员不启动', async () => {
+    const port = await freePort()
+    const setup = fixtureSetup(`node ${serveFixture} ${port}`, port)
+    const { manager, openExternal } = makeManager(setup.configPath, setup.base, {
+      autostartDelayMs: 0,
+      autostartStaggerMs: 0
+    })
+    await manager.init()
+    await manager.startAutostarts()
+    await sleep(300)
+
+    expect(stateOf(manager)).toBe('stopped')
+    expect(openExternal).not.toHaveBeenCalled()
+  })
+
+  it('autostart：静默拉起，不开浏览器；stop 后不自动重启', async () => {
+    const port = await freePort()
+    const setup = fixtureSetup(`node ${serveFixture} ${port}`, port, 'autostart = true\n')
+    const { manager, openExternal } = makeManager(setup.configPath, setup.base, {
+      autostartDelayMs: 0,
+      autostartStaggerMs: 0
+    })
+    await manager.init()
+    await manager.startAutostarts()
+    await waitFor(() => stateOf(manager) === 'running', 8000)
+    expect(openExternal).not.toHaveBeenCalled()
+
+    await manager.stop('fixture-web')
+    await waitFor(() => stateOf(manager) === 'stopped', 5000)
+    await sleep(1600)
+    expect(stateOf(manager)).toBe('stopped')
+  }, 15_000)
+
+  it('autostart：已在跑时只认领，不开浏览器', async () => {
+    const port = await freePort()
+    const setup = fixtureSetup(`node ${serveFixture} ${port}`, port, 'autostart = true\n')
+    const child = spawn('node', [serveFixture, String(port)], { stdio: 'ignore' })
+    junk.children.push(child)
+    await waitFor(
+      () => new Promise<boolean>((r) => fetch(setup.url).then(() => r(true), () => r(false))),
+      5000
+    )
+
+    const { manager, openExternal } = makeManager(setup.configPath, setup.base, {
+      autostartDelayMs: 0,
+      autostartStaggerMs: 0
+    })
+    await manager.init()
+    await manager.startAutostarts()
+    await waitFor(() => stateOf(manager) === 'running', 8000)
+    expect(openExternal).not.toHaveBeenCalled()
+
+    await manager.stop('fixture-web')
+    await waitFor(() => stateOf(manager) === 'stopped', 8000)
+  }, 15_000)
+
+  it('autostart：按 name 顺序拉起多个成员', async () => {
+    const port = await freePort()
+    const setup = fixtureSetup(`node ${serveFixture} ${port}`, port, 'autostart = true\n')
+    const port2 = await freePort()
+    const repo2 = join(setup.root, 'a-fixture')
+    mkdirSync(repo2, { recursive: true })
+    writeFileSync(
+      join(repo2, 'app.toml'),
+      `name = "a-fixture"\ntitle = "A Fixture"\ntype = "web"\nstart = "node ${serveFixture} ${port2}"\nurl = "http://127.0.0.1:${port2}"\nready = "http:/healthz"\nautostart = true\n`
+    )
+
+    const { manager, openExternal } = makeManager(setup.configPath, setup.base, {
+      autostartDelayMs: 0,
+      autostartStaggerMs: 0
+    })
+    await manager.init()
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    try {
+      await manager.startAutostarts()
+      await waitFor(
+        () => stateOfName(manager, 'a-fixture') === 'running' && stateOf(manager) === 'running',
+        10_000
+      )
+      expect(
+        log.mock.calls.some((c) => String(c[0]).includes('autostart: a-fixture, fixture-web'))
+      ).toBe(true)
+      expect(openExternal).not.toHaveBeenCalled()
+    } finally {
+      log.mockRestore()
+      await manager.stop('a-fixture')
+      await manager.stop('fixture-web')
+    }
+    await waitFor(
+      () => stateOfName(manager, 'a-fixture') === 'stopped' && stateOf(manager) === 'stopped',
+      8000
+    )
+  }, 20_000)
+
+  it('autostart：分支不对 → blocked，不 spawn、不开浏览器', async () => {
+    const port = await freePort()
+    const setup = fixtureSetup(
+      `node ${serveFixture} ${port}`,
+      port,
+      'branch = "main"\nautostart = true\n'
+    )
+    const repo = join(setup.root, 'fixture-web')
+    await sh('git', ['-C', repo, 'init', '-q', '-b', 'main'])
+    await sh('git', [
+      '-C',
+      repo,
+      '-c',
+      'user.name=t',
+      '-c',
+      'user.email=t@t.t',
+      'commit',
+      '-q',
+      '--allow-empty',
+      '-m',
+      'x'
+    ])
+    await sh('git', ['-C', repo, 'checkout', '-q', '-b', 'dev'])
+
+    const { manager, openExternal } = makeManager(setup.configPath, setup.base, {
+      autostartDelayMs: 0,
+      autostartStaggerMs: 0
+    })
+    await manager.init()
+    await manager.startAutostarts()
+    await waitFor(() => stateOf(manager) === 'blocked', 5000)
+
+    const app = manager.list().apps.find((a) => a.name === 'fixture-web')
+    expect(app?.line).toContain('分支')
+    expect(openExternal).not.toHaveBeenCalled()
+    expect(existsSync(join(setup.base, 'pids', 'fixture-web.pid'))).toBe(false)
+  }, 10_000)
+
+  it('autostart：端口被占 → blocked，不开浏览器', async () => {
+    const port = await freePort()
+    const setup = fixtureSetup(`node ${serveFixture} ${port}`, port, 'autostart = true\n')
+    const occupant = createServer((_req, res) => res.writeHead(503).end())
+    await new Promise<void>((r) => occupant.listen(port, '127.0.0.1', r))
+    junk.servers.push(occupant)
+
+    const { manager, openExternal } = makeManager(setup.configPath, setup.base, {
+      autostartDelayMs: 0,
+      autostartStaggerMs: 0
+    })
+    await manager.init()
+    await manager.startAutostarts()
+
+    expect(stateOf(manager)).toBe('blocked')
+    const app = manager.list().apps.find((a) => a.name === 'fixture-web')
+    expect(app?.line).toContain(String(port))
+    expect(openExternal).not.toHaveBeenCalled()
+    expect(existsSync(join(setup.base, 'pids', 'fixture-web.pid'))).toBe(false)
+  }, 10_000)
+
+  it('stop 不会误杀 blocked 状态下的端口占用者', async () => {
+    const port = await freePort()
+    const setup = fixtureSetup(`node ${serveFixture} ${port}`, port)
+    const occupant = spawn(
+      'node',
+      [
+        '-e',
+        `require('node:http').createServer((q, s) => s.writeHead(503).end()).listen(${port}, '127.0.0.1')`
+      ],
+      { stdio: 'ignore' }
+    )
+    junk.children.push(occupant)
+    await waitFor(
+      () => fetch(setup.url).then((r) => r.status === 503, () => false),
+      5000
+    )
+
+    const { manager } = makeManager(setup.configPath, setup.base)
+    await manager.init()
+    await manager.start('fixture-web')
+    await waitFor(() => stateOf(manager) === 'blocked', 5000)
+
+    await manager.stop('fixture-web')
+    await sleep(500)
+    expect(occupant.exitCode).toBeNull()
+    expect(occupant.killed).toBe(false)
+    expect(await fetch(setup.url).then((r) => r.status)).toBe(503)
+  }, 10_000)
 })

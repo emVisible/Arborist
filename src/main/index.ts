@@ -20,6 +20,9 @@ if (!app.requestSingleInstanceLock()) {
       registerIpc(manager)
       const tray = new TrayController(manager)
       tray.start()
+      void manager
+        .startAutostarts()
+        .catch((e) => console.warn(`[arborist] autostart 失败：${(e as Error).message}`))
       app.on('activate', () => tray.showPanel())
       if (!app.isPackaged) tray.showPanel()
 
