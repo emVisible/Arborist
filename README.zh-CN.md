@@ -6,7 +6,7 @@
 
 我做了很多小工具，每个都长出了自己的启动入口——`dev.sh`、`start.sh`、`webui.sh`、Makefile，或者只是肌肉记忆里的 shell 历史。Arborist 用一个约定替代这一切：想被管理的 repo 在根目录放一个 `app.toml`，剩下的交给 Arborist。
 
-当前状态：**v0.3.1**——中控台、本地 API 与门户均已交付；里程碑与验收标准见 [PLAN.md](PLAN.md)。
+当前状态：**v0.4.0**——中控台、本地 API、门户与「开机即绿」自启均已交付；里程碑与验收标准见 [PLAN.md](PLAN.md)。
 
 ## 文档
 
@@ -29,7 +29,7 @@
 
 ```sh
 pnpm install
-pnpm dist        # → release/Arborist-0.3.1-arm64.dmg
+pnpm dist        # → release/Arborist-0.4.0-arm64.dmg
 ```
 
 源码运行：`pnpm dev`。不启动 Electron、在浏览器里直接调 dropdown UI：`pnpm preview:ui`。
@@ -39,6 +39,8 @@ pnpm dist        # → release/Arborist-0.3.1-arm64.dmg
 1. 首次启动会生成 `~/.arborist/config.toml`——把 `roots` 配成你的 repo 所在目录（默认 `["~/Code"]`）。
 2. 在这些目录下的任意 repo 根目录放一个 `app.toml`（[规范](docs/app-toml.md)）。本机装着、源码仓却不在这台机器上的 app，可以改住 `~/.arborist/members/<name>/app.toml`——把这个目录登记成一个 root，其余一切不变。
 3. 点击托盘图标：左键一行启动/打开；右键有停止、日志、Finder、登录项。web 类点启动会先查端口：已在跑就认领（不双开），被占则黄灯并点名占用者。菜单栏放不下时图标会被挤到刘海下——按 `⌥⌘A`（config 的 `hotkey` 可改）随时唤出面板。
+
+web 成员可在清单里写 `autostart = true`：Arborist 启动后静默拉起（不开浏览器、不抢焦点），你手动停掉的不会被重启。
 
 实现了 [`/api/arbor/status`](docs/arbor-status.md) 的成员 app 状态灯显示"自报健康 + 一行状态"，否则降级为端口探测（实现约 30 分钟）。
 

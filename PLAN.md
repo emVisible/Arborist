@@ -299,6 +299,8 @@ Arborist 自己的 app.toml（`type = "menubar"`，自注册）；Ametrine 实�
 
 **v0.4.0 完成定义**：M13–M15 全过；场景 A 真实通过（一次整机重启，无终端、无面板弹窗、Ametrine 绿）；场景 B/C 行为诚实。
 
+**收尾状态（2026-11-15）**：M13/M14 代码与打包完成；M15 的 dmg / 安装 `/Applications` / 冒烟完成，真实重启 A/B/C 待主人。Ametrine 现已 `running`、契约 `ok`（2026-11-15 复核）；登录项已迁移到 `/Applications`（footer 读取 true），真实登录启动仍待重启验证。
+
 ## 明确不做（v0.4）
 
 - 全局搜索 / 门户搜索：门槛仍是 ≥3 个成员实现 status 契约（只有 Ametrine）。

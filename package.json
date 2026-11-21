@@ -1,6 +1,6 @@
 {
   "name": "arborist",
-  "version": "0.3.1",
+  "version": "0.4.0",
   "description": "Menu-bar control center for my personal app ecosystem",
   "main": "out/main/index.js",
   "author": "emVisible",

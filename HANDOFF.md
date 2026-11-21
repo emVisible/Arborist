@@ -6,7 +6,7 @@
 
 Arborist 是主人（emVisible，本地用户 `young`）的个人 app 中控台：常驻 macOS menu bar 的 Electron 应用，管理他自己开发的一批小软件（web 服务 / 桌面应用 / menu bar 守护三类）。它是《The Grove 个人数字生态蓝图》中 Grove 模块的落地形态——中控台先行，浏览器门户已随 v0.2.0 交付。定位一句话：**管点火，不管聚合；产品模式，不是开发模式**。
 
-当前状态：**v0.3.1 已发布**（dmg 在 `release/Arborist-0.3.1-arm64.dmg`）：v0.3.0「端口诚实」——web 启动前端口体检（已在跑认领 / 被占 blocked 并点名占用者）、门户端口失败在面板可见；0.3.1 修复了并发启动双开。45 个测试全绿。**v0.4.0「开机即绿」计划已立档（PLAN.md，M13–M15），尚未开工。**
+当前状态：**v0.4.0 已打包并安装到 `/Applications`**（dmg 在 `release/Arborist-0.4.0-arm64.dmg`）：v0.3.1 及之前的中控台/门户/端口体检已交付；v0.4.0 M13（web `autostart` 静默自启）、M14（self 登录项去重）代码完成，M15 的真实重启验收待主人。54 个测试全绿。
 
 真实注册表有 **六个成员**：Arborist 自注册 + **Ametrine**（web；栈在跑时契约回 `ok`，绿）+ **Hertz**（app，v0.37.0，repo 内构建经 LaunchServices 注册）+ **Axiforge**（app，已登记，Tauri 成品未构建）+ **Thistelles** / **MiniStat**（menubar，住清单目录）。**v1 验收的「三类 app 各至少一个真实成员」到此满足**；未注册目录剩 7 个（Axis、Ginko、Thistelles、VisualNovel、_refs、rewind、truth）。Ametrine 侧改动已提交（它自己 repo 的 `9d52dee`）；Hertz 的 `app.toml` 未提交（它 repo 的 AGENTS.md 要求提交前跑 `--quick`，留给主人）。
 
@@ -29,7 +29,7 @@ src/shared/types.ts 前后端共享类型
 resources/portal/   门户页（无构建单文件 HTML，时间氛围主题）
 scripts/            gen-icons.mjs（零依赖 PNG 编码器）/ preview 两件套
 fixtures/           spawn-tree.sh / serve.mjs（集成测试夹具）
-tests/              7 文件 45 用例
+tests/              7 文件 54 用例
 ```
 
 数据流：registry 发现 → manager 持状态机 → poll 驱动灯色 → 事件 `update`/`refresh` 广播到托盘面板与门户。状态不持久化（认领 = 重启后重新轮询）。
@@ -80,6 +80,9 @@ node scripts/gen-icons.mjs   # 重新生成托盘/应用图标（改图标后必
 9. **Ametrine 数据层是三套东西拼的**：原生 Postgres（`.env` 指向 `young@localhost:5432`，用 `brew services start postgresql@18` 起；compose 里的 postgres 会和它撞 5432，**别跑整份 `docker compose up`**）+ compose 的 redis（`docker compose -f apps/database/docker-compose.yml up -d redis`）+ 一个 10/18 建的 embedded Milvus 裸容器（`ametrine-milvus`，ETCD_USE_EMBED + 本地存储，无 compose 标签、不需要 MinIO）。MinIO 镜像在本机镜像源上拉不下来（两个 tag 都 EOF），所以 compose 的 milvus 起不了。Docker Desktop 若不开机自启，Redis/Milvus 重启后缺席，契约会如实回 degraded。
 10. **菜单栏满时状态项会被挤到刘海下，系统不报错**（2026-11-01 实测）：`Tray.getBounds()` 量到 `{x:713,y:0,w:32,h:37}`（屏宽 1470，正中是刘海），图标完全不可见；临时退掉 Thistelles 让出一格，树图标立刻出现在最左侧。兜底入口是全局快捷键 `⌥⌘A`（config 的 `hotkey`，改完重启生效）。排查这类"应用没反应"还要看单实例锁：旧实例没退干净时再跑 `pnpm dev` 会静默退出、终端什么都不报。
 
+11. **登录项启动的 GUI app 只有系统 PATH**（`/usr/bin:/bin:/usr/sbin:/sbin`）：web 成员脚本里的 `node` / `pnpm` / `uv` 在开机自启时会找不到。0.4.0 已在 `startWeb` 里取一次 `$SHELL -lic` 的 PATH 注入子进程（失败回退进程 PATH）；排查「终端能起、开机起不来」先看这里。
+12. **Isla 的 uvicorn 曾常驻 `127.0.0.1:8000`**，与 Ametrine 的 `url` 冲突；冲突时 Ametrine 自启会如实 `blocked` 并点名占用者。2026-11-15 复核：8000 已由 Ametrine 占用，契约 `ok`；若 Isla 再起，冲突会重现。
+
 ## 主人的生态背景（接活时对齐用）
 
 - 活跃 app：Ametrine（web，FastAPI，repo 有 dev.sh，正在重构）、Hertz（Electron 桌面平台，最活跃）、Axiforge（Electron）、Ginko（存疑）；menu bar 类：Thistelles、ministat、sidereal-desk。
@@ -109,18 +112,27 @@ node scripts/gen-icons.mjs   # 重新生成托盘/应用图标（改图标后必
 | Axiforge | Tauri 桌面从未构建（全仓 0 个 `.app`），只有 `pnpm dev:desktop` | 构建产物 |
 | Thistelles | 源码仓不在本机（uv receipt 指向已删除的 `~/Code/Thistelles`），只有 `/Applications` 里的成品在跑 → **已接入清单目录** | 已接入；`open` 必须写 `com.thistelles.app`，因为打包后的进程名是 `PythonRuntime`，`pgrep -x Thistelles` 匹配不到。本机清单已加 `login = true`（2026-11-13），登录项开关待实测 |
 | MiniStat | 同上 | 已接入（`com.ministat.app`）；没声明 `login`，登录项状态仍归主人自己管 |
-| Ametrine 想真绿 | **已绿**：原生 PG（`brew services start postgresql@18`）+ compose redis 容器 + 10/18 就存在的 embedded milvus 容器；契约实测 `{"state":"ok","line":"v0.3.0 · 依赖全部正常"}` | 常驻已开：Docker `AutoStart=True`（settings-store），Redis/Milvus 均 `restart=unless-stopped`，2026-11-13 实测随 Docker 启动即 healthy；Milvus 是 `ETCD_USE_EMBED` + 本地存储的裸容器，不归 compose 管。整机重启验收留给 v0.4 M15 |
+| Ametrine 想真绿 | **已绿**：原生 PG（`brew services start postgresql@18`）+ compose redis 容器 + 10/18 就存在的 embedded milvus 容器；契约实测 `{"state":"ok","line":"v0.3.0 · 依赖全部正常"}` | 常驻已开：Docker `AutoStart=True`（settings-store），Redis/Milvus 均 `restart=unless-stopped`，2026-11-13 实测随 Docker 启动即 healthy；Milvus 是 `ETCD_USE_EMBED` + 本地存储的裸容器，不归 compose 管。清单已加 `autostart = true`（2026-11-15）。整机重启验收留给 v0.4 M15；注意 Isla 的 uvicorn 占 8000 时会 blocked |
 
-## 下一步（v0.4 已立档）
+## 下一步（v0.4 进行中）
 
-**v0.4.0「开机即绿」（M13–M15，见 PLAN.md）**：登录后 Arborist 静默起身，声明 `autostart = true` 的 web 成员自动拉起；不抢焦点、不自动开浏览器、不假装健康。
+**v0.4.0「开机即绿」（M13–M15，见 PLAN.md）**：M13/M14 代码完成，M15 待真实重启验收。
+
+**已完成（2026-11-15）**：
+1. `autostart` 仅 web，静默拉起、不自动开浏览器、已跑只认领、stop 后不重启；manager/tests/docs 全绿（54 用例）。
+2. 登录 PATH：`startWeb` 注入登录 shell 的 PATH。用 LaunchServices 启动的 `/Applications` 包 + 临时 fixture 实测自启成功（无终端、无浏览器）；验完 fixture 已删除。
+3. 停止安全：`blocked` / `error` 状态不再按端口兜底击杀（端口上的进程未必属于该成员）；`running` / `degraded` 的认领停止语义不变。补回归用例。
+4. self 清单去掉 `login = true`；0.4.0 已装 `/Applications`；旧的 `release` 登录项已迁移，当前系统登录项指向 `/Applications/Arborist.app`，footer `selfLoginGet()` 实测为 `true`。
+5. Ametrine 清单已加 `autostart = true`。
+
+**待主人**：
+1. footer `自启` 开关当前应为开（登录项已指向 `/Applications/Arborist.app`）；做一次关→开，确认系统设置同步；再注销/重启验证菜单栏图标出现、无面板/浏览器弹窗。
+2. Thistelles 登录项开关勾选/取消验证（系统登录项里当前已有 Thistelles）。
+3. 真实重启 M15：Ametrine 现已 `running`、契约 `ok`（2026-11-15 复核）；重启后确认它仍自启变绿。B 停 Docker/依赖看橙灯并点名；C 占端口/切分支看 blocked、不双开。
+
+**仓库状态**：v0.4 改动尚未提交（14 个文件）；dmg 已生成并安装。建议按 M13（autostart + 登录 PATH + 停止安全）/ M14（登录项与文档）/ M15（版本、CHANGELOG、README）分三个提交，或合成一个 `M13–M15: 开机即绿`。
 
 **已定档**：Docker 自启=开；Hertz=保持 repo 内构建；Axiforge=暂不构建；Thistelles 本机清单加 `login = true`。
-
-**前置（未完成）**：
-1. v1 手工回归：Hertz 面板一键开/退、Thistelles 登录项开关；Ametrine 本次环境改动后的 start→绿。
-2. self 清单 `open` 改为 bundle id（本机已改，待提交）——打包态自检灯才是绿的。
-3. 登录自启验收前把 0.4.0 dmg 装进 `/Applications`；当前只有 release 内构建，登录项会指向它。
 
 **不选其他候选的理由**：搜索仍卡 ≥3 个成员实现 status 契约；自动更新没有 tag/release，且 GitHub API/tags 在本机实测超时；门户快捷操作仍在 PROJECT.md 决策门槛内；E2E 留 backlog，v0.4 用真实重启验收替代。
 

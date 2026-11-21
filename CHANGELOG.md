@@ -1,5 +1,15 @@
 # Changelog
 
+## 0.4.0 — 2026-11-15
+
+主题：开机即绿——登录后自动起身，安静把该亮的灯点亮。
+
+- **web 成员自启**：`app.toml` 新增 `autostart`（仅 web）。Arborist 启动后延迟 2s，按 name 顺序每 1s 静默拉起；不抢浏览器焦点，已在跑只认领，分支/端口异常照常 `blocked` 并在 line 说明。只点火，不守护：手动 stop 后不自动重启
+- **自身登录项去重**：self manifest 去掉 `login = true`，Arborist 自启统一由面板 footer 的原生开关管理，避免和卡片右键的 System Events 路径重复
+- **登录 PATH**：web 启动命令继承用户登录 shell 的 `PATH`（`$SHELL -lic` 取一次，失败回退）。登录项启动的 GUI app 默认只有系统 PATH，不修的话来自 shell profile 的 `node` / `pnpm` / `uv` 在开机自启时会找不到
+- **停止安全**：`blocked` / `error` 状态不再按端口兜底击杀——端口上的进程未必属于这个成员，只清自己的 pidfile。避免 Ametrine 被别的服务占着 8000 时点「停止」误杀占用者
+- 文档补齐 `autostart` 字段与「自启与静默」约定；测试 54 个（+9）
+
 ## 0.3.1 — 2026-11-13
 
 - **修复**：并发点击「启动」会双开——branch / 端口检查到 spawn 之间新增 in-flight 守卫，第二次点击直接忽略；补并发回归用例
